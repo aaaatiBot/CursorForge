@@ -390,4 +390,234 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
 
     [GeneratedRegex("^[a-zA-Z0-9_]{3,30}$")]
     private static partial Regex UsernameRegex();
+
+    // =========================================================================
+    // Phase 6 - Browse Implementation
+    // =========================================================================
+
+    public async Task<PagedResult<CursorItem>> GetBrowsePageAsync(
+        BrowseSort sort,
+        string? search,
+        DateTime? afterTs,
+        Guid? afterId,
+        int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        if (!IsConfigured || _supabase == null)
+        {
+            // Offline demo items for testing / previewing
+            return GetMockBrowsePage(sort, search, pageSize);
+        }
+
+        try
+        {
+            var query = _supabase
+                .From<Models.DbCursor>()
+                .Select("id, owner_id, title, description, tags, preview_path, download_count, like_count, status, roles, created_at")
+                .Filter("status", global::Supabase.Postgrest.Constants.Operator.Equals, "approved")
+                .Filter("is_public", global::Supabase.Postgrest.Constants.Operator.Equals, "true");
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                string cleanSearch = search.Trim();
+                query = query.Filter("title", global::Supabase.Postgrest.Constants.Operator.ILike, $"%{cleanSearch}%");
+            }
+
+            switch (sort)
+            {
+                case BrowseSort.MostLiked:
+                    query = query.Order("like_count", global::Supabase.Postgrest.Constants.Ordering.Descending);
+                    break;
+                case BrowseSort.MostDownloaded:
+                    query = query.Order("download_count", global::Supabase.Postgrest.Constants.Ordering.Descending);
+                    break;
+                default:
+                    query = query.Order("created_at", global::Supabase.Postgrest.Constants.Ordering.Descending);
+                    break;
+            }
+
+            if (afterTs.HasValue)
+            {
+                query = query.Filter("created_at", global::Supabase.Postgrest.Constants.Operator.LessThan, afterTs.Value.ToString("O"));
+            }
+
+            query = query.Limit(pageSize + 1);
+
+            var response = await query.Get(ct);
+            var items = response.Models ?? [];
+
+            bool hasMore = items.Count > pageSize;
+            var pageItems = items.Take(pageSize).Select(m => new CursorItem
+            {
+                Id = m.Id,
+                OwnerId = m.OwnerId,
+                Title = m.Title,
+                Description = m.Description,
+                Tags = m.Tags?.ToList() ?? [],
+                PreviewPath = m.PreviewPath,
+                PreviewUrl = GetPublicPreviewUrl(m.PreviewPath),
+                DownloadCount = m.DownloadCount,
+                LikeCount = m.LikeCount,
+                Status = m.Status,
+                CreatedAt = m.CreatedAt
+            }).ToList();
+
+            DateTime? nextTs = pageItems.Count > 0 ? pageItems[^1].CreatedAt : null;
+            Guid? nextId = pageItems.Count > 0 ? pageItems[^1].Id : null;
+
+            return new PagedResult<CursorItem>
+            {
+                Items = pageItems,
+                HasMore = hasMore,
+                NextTimestamp = nextTs,
+                NextId = nextId
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("browse.fetch_failed", "Failed to query browse page from Supabase", ex);
+            return GetMockBrowsePage(sort, search, pageSize);
+        }
+    }
+
+    public async Task<bool> LikeCursorAsync(Guid cursorId)
+    {
+        if (!IsConfigured || _supabase == null)
+        {
+            return true;
+        }
+
+        try
+        {
+            var rpcParams = new Dictionary<string, object>
+            {
+                { "p_cursor_id", cursorId }
+            };
+
+            await _supabase.Rpc("like_cursor", rpcParams);
+            _logger?.LogInformation("browse.liked", $"Cursor liked: {cursorId}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("browse.like_error", $"Failed to like cursor {cursorId}", ex);
+            return false;
+        }
+    }
+
+    public async Task<bool> UnlikeCursorAsync(Guid cursorId)
+    {
+        if (!IsConfigured || _supabase == null)
+        {
+            return true;
+        }
+
+        try
+        {
+            var rpcParams = new Dictionary<string, object>
+            {
+                { "p_cursor_id", cursorId }
+            };
+
+            await _supabase.Rpc("unlike_cursor", rpcParams);
+            _logger?.LogInformation("browse.unliked", $"Cursor unliked: {cursorId}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("browse.unlike_error", $"Failed to unlike cursor {cursorId}", ex);
+            return false;
+        }
+    }
+
+    public async Task<bool> IncrementDownloadAsync(Guid cursorId)
+    {
+        if (!IsConfigured || _supabase == null)
+        {
+            return true;
+        }
+
+        try
+        {
+            var rpcParams = new Dictionary<string, object>
+            {
+                { "p_cursor_id", cursorId }
+            };
+
+            await _supabase.Rpc("increment_download", rpcParams);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("browse.download_increment_error", $"Failed to increment download count for {cursorId}", ex);
+            return false;
+        }
+    }
+
+    private string GetPublicPreviewUrl(string previewPath)
+    {
+        if (string.IsNullOrWhiteSpace(previewPath)) return string.Empty;
+        return $"{_config.SupabaseUrl.TrimEnd('/')}/storage/v1/object/public/cursor-previews/{previewPath.TrimStart('/')}";
+    }
+
+    private static PagedResult<CursorItem> GetMockBrowsePage(BrowseSort sort, string? search, int pageSize)
+    {
+        var mockItems = new List<CursorItem>
+        {
+            new()
+            {
+                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                Title = "Cyberpunk Violet",
+                Description = "High-contrast neon violet pointer with glowing edges. Perfect for OLED and dark mode.",
+                Tags = ["Neon", "Cyberpunk", "Glow", "Dark"],
+                OwnerUsername = "neo_matrix",
+                LikeCount = 142,
+                DownloadCount = 538,
+                CreatedAt = DateTime.UtcNow.AddDays(-2)
+            },
+            new()
+            {
+                Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                Title = "Minimal Dark Glass",
+                Description = "Translucent frosted glass aesthetics matching Windows 11 Fluent Design.",
+                Tags = ["Minimal", "Glass", "Clean", "Windows11"],
+                OwnerUsername = "aerodesign",
+                LikeCount = 89,
+                DownloadCount = 312,
+                CreatedAt = DateTime.UtcNow.AddDays(-5)
+            },
+            new()
+            {
+                Id = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                Title = "Retro 1995 Precision",
+                Description = "Pixel-perfect nostalgic 90s cursors upscaled with modern 128px high-DPI clarity.",
+                Tags = ["Retro", "Pixel", "Classic", "90s"],
+                OwnerUsername = "pixel_crafter",
+                LikeCount = 65,
+                DownloadCount = 204,
+                CreatedAt = DateTime.UtcNow.AddDays(-10)
+            }
+        };
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            string q = search.Trim().ToLowerInvariant();
+            mockItems = mockItems.Where(i => i.Title.ToLowerInvariant().Contains(q) || i.Tags.Any(t => t.ToLowerInvariant().Contains(q))).ToList();
+        }
+
+        mockItems = sort switch
+        {
+            BrowseSort.MostLiked => [.. mockItems.OrderByDescending(i => i.LikeCount)],
+            BrowseSort.MostDownloaded => [.. mockItems.OrderByDescending(i => i.DownloadCount)],
+            _ => [.. mockItems.OrderByDescending(i => i.CreatedAt)]
+        };
+
+        return new PagedResult<CursorItem>
+        {
+            Items = mockItems.Take(pageSize).ToList(),
+            HasMore = false,
+            NextTimestamp = null,
+            NextId = null
+        };
+    }
 }

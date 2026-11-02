@@ -20,10 +20,10 @@ public class NavigationTests
         themeMgrMock.Setup(m => m.LoadAllThemes()).Returns([]);
         var cursorServiceMock = new Mock<ISystemCursorService>();
         var libraryVM = new LibraryViewModel(themeMgrMock.Object, cursorServiceMock.Object, _loggerMock.Object);
-        var browseVM = new BrowseViewModel();
+        var supabaseMock = new Mock<CursorForge.Client.Services.Supabase.ISupabaseClientService>();
+        var browseVM = new BrowseViewModel(supabaseMock.Object, _loggerMock.Object);
         var uploadVM = new UploadViewModel();
         var myCursorsVM = new MyCursorsViewModel();
-        var supabaseMock = new Mock<CursorForge.Client.Services.Supabase.ISupabaseClientService>();
         var accountVM = new AccountViewModel(supabaseMock.Object, _loggerMock.Object);
 
         _mainViewModel = new MainViewModel(
