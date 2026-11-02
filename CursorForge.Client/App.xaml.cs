@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using CursorForge.Client.Services;
 using CursorForge.Client.ViewModels;
 using CursorForge.Client.Views;
@@ -24,6 +24,9 @@ public partial class App : Application
         var storage = Services.GetRequiredService<ILocalStorageService>();
         storage.CleanupStaleTempFiles();
 
+        var systemCursors = Services.GetRequiredService<ISystemCursorService>();
+        systemCursors.CheckAndRecoverPendingApply();
+
         var mainWindow = Services.GetRequiredService<MainWindow>();
         mainWindow.Show();
     }
@@ -33,6 +36,8 @@ public partial class App : Application
         // Core Singletons
         services.AddSingleton<IStructuredLogger, StructuredLogger>();
         services.AddSingleton<ILocalStorageService, LocalStorageService>();
+        services.AddSingleton<ICursorConverterService, CursorConverterService>();
+        services.AddSingleton<ISystemCursorService, SystemCursorService>();
 
         // ViewModels
         services.AddSingleton<LibraryViewModel>();

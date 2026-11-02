@@ -1,0 +1,84 @@
+{
+  "id": "neon-cyan",
+  "name": "Neon Cyan",
+  "description": "Official Neon Cyan offline cursor scheme for CursorForge.",
+  "author": "CursorForge Official",
+  "preview": "preview.png",
+  "roles": {
+    "Arrow": {
+      "file": "Arrow.png",
+      "hotspot_x": 4,
+      "hotspot_y": 4
+    },
+    "Help": {
+      "file": "Help.png",
+      "hotspot_x": 4,
+      "hotspot_y": 4
+    },
+    "AppStarting": {
+      "file": "AppStarting.png",
+      "hotspot_x": 4,
+      "hotspot_y": 4
+    },
+    "Wait": {
+      "file": "Wait.png",
+      "hotspot_x": 64,
+      "hotspot_y": 64
+    },
+    "Crosshair": {
+      "file": "Crosshair.png",
+      "hotspot_x": 64,
+      "hotspot_y": 64
+    },
+    "IBeam": {
+      "file": "IBeam.png",
+      "hotspot_x": 64,
+      "hotspot_y": 64
+    },
+    "NWPen": {
+      "file": "NWPen.png",
+      "hotspot_x": 4,
+      "hotspot_y": 4
+    },
+    "No": {
+      "file": "No.png",
+      "hotspot_x": 4,
+      "hotspot_y": 4
+    },
+    "SizeNS": {
+      "file": "SizeNS.png",
+      "hotspot_x": 4,
+      "hotspot_y": 4
+    },
+    "SizeWE": {
+      "file": "SizeWE.png",
+      "hotspot_x": 4,
+      "hotspot_y": 4
+    },
+    "SizeNWSE": {
+      "file": "SizeNWSE.png",
+      "hotspot_x": 4,
+      "hotspot_y": 4
+    },
+    "SizeNESW": {
+      "file": "SizeNESW.png",
+      "hotspot_x": 4,
+      "hotspot_y": 4
+    },
+    "SizeAll": {
+      "file": "SizeAll.png",
+      "hotspot_x": 4,
+      "hotspot_y": 4
+    },
+    "UpArrow": {
+      "file": "UpArrow.png",
+      "hotspot_x": 4,
+      "hotspot_y": 4
+    },
+    "Hand": {
+      "file": "Hand.png",
+      "hotspot_x": 48,
+      "hotspot_y": 16
+    }
+  }
+}
