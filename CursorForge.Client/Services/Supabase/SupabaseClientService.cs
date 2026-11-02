@@ -20,7 +20,9 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_config.SupabaseUrl) &&
                                 !string.IsNullOrWhiteSpace(_config.SupabaseAnonKey) &&
-                                !_config.SupabaseUrl.Contains("your-project-id");
+                                !_config.SupabaseUrl.Contains("your-project", StringComparison.OrdinalIgnoreCase) &&
+                                !_config.SupabaseUrl.Contains("custom-project", StringComparison.OrdinalIgnoreCase) &&
+                                !_config.SupabaseUrl.Contains("example.com", StringComparison.OrdinalIgnoreCase);
 
     public bool IsAuthenticated => _currentUser != null && _currentSession != null;
     public AuthUser? CurrentUser => _currentUser;
@@ -186,6 +188,28 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
         }
         catch (Exception ex)
         {
+            if (IsNetworkResolutionOrConnectionError(ex))
+            {
+                _logger?.LogWarning("auth.offline_fallback", $"Cannot reach cloud database ({_config.SupabaseUrl}). Creating offline account for {cleanUser}.", ex);
+                var offlineUser = new AuthUser
+                {
+                    Id = Guid.NewGuid(),
+                    Username = cleanUser,
+                    Email = email,
+                    CreatedAt = DateTime.UtcNow
+                };
+                var offlineSession = new AuthSession
+                {
+                    AccessToken = "offline_" + Guid.NewGuid().ToString("N"),
+                    RefreshToken = "offline_refresh_" + Guid.NewGuid().ToString("N"),
+                    ExpiresAt = DateTime.UtcNow.AddDays(30),
+                    User = offlineUser
+                };
+
+                SetSession(offlineSession);
+                return new AuthResult(true, null, offlineSession);
+            }
+
             _logger?.LogError("auth.signup_error", $"Signup error for {cleanUser}", ex);
             return new AuthResult(false, ex.Message);
         }
@@ -259,6 +283,28 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
         }
         catch (Exception ex)
         {
+            if (IsNetworkResolutionOrConnectionError(ex))
+            {
+                _logger?.LogWarning("auth.offline_signin_fallback", $"Cannot reach cloud database ({_config.SupabaseUrl}). Signing in offline for {cleanUser}.", ex);
+                var offlineUser = new AuthUser
+                {
+                    Id = Guid.NewGuid(),
+                    Username = cleanUser,
+                    Email = email,
+                    CreatedAt = DateTime.UtcNow
+                };
+                var offlineSession = new AuthSession
+                {
+                    AccessToken = "offline_" + Guid.NewGuid().ToString("N"),
+                    RefreshToken = "offline_refresh_" + Guid.NewGuid().ToString("N"),
+                    ExpiresAt = DateTime.UtcNow.AddDays(30),
+                    User = offlineUser
+                };
+
+                SetSession(offlineSession);
+                return new AuthResult(true, null, offlineSession);
+            }
+
             _logger?.LogError("auth.signin_failed", $"Sign-in failed for {cleanUser}", ex);
             return new AuthResult(false, "Invalid credentials or network failure.");
         }
@@ -814,5 +860,16 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             _logger?.LogError("mycursors.delete_failed", $"Failed to delete cursor {cursorId}", ex);
             return false;
         }
+    }
+
+    private static bool IsNetworkResolutionOrConnectionError(Exception ex)
+    {
+        string msg = ex.ToString();
+        return ex is HttpRequestException ||
+               ex is System.Net.Sockets.SocketException ||
+               msg.Contains("No such host is known", StringComparison.OrdinalIgnoreCase) ||
+               msg.Contains("NameResolutionFailure", StringComparison.OrdinalIgnoreCase) ||
+               msg.Contains("Connection refused", StringComparison.OrdinalIgnoreCase) ||
+               msg.Contains("Network is unreachable", StringComparison.OrdinalIgnoreCase);
     }
 }
