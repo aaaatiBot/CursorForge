@@ -195,10 +195,10 @@ cursorforge/
 | **Phase 2** | Cursor Engine (Multi-DPI `.cur` encoder, Win32 registry manager, atomic recovery) | ✅ Complete |
 | **Phase 3** | Offline Library (Theme manager, starter themes, `.cursorforge` ZIP import/export) | ✅ Complete |
 | **Phase 4** | Supabase Backend (PostgreSQL schema, RLS policies, RPCs, Deno Edge Functions) | ✅ Complete |
-| **Phase 5** | Authentication (DPAPI secure storage, Account UI, single-use recovery code modal) | 🔄 Next |
-| **Phase 6** | Online Browse (Public cursor gallery, keyset pagination, live likes & downloads) | 📅 Scheduled |
-| **Phase 7** | Creator Studio (In-app hotspot picker, upload session workflow, theme publishing) | 📅 Scheduled |
-| **Phase 8** | Production Hardening (CI/CD GitHub Actions, Velopack packaging, release testing) | 📅 Scheduled |
+| **Phase 5** | Authentication (DPAPI secure storage, Account UI, single-use recovery code modal) | ✅ Complete |
+| **Phase 6** | Online Browse (Public cursor gallery, keyset pagination, live likes & downloads) | ✅ Complete |
+| **Phase 7** | Creator Studio (In-app hotspot picker, upload session workflow, theme publishing) | ✅ Complete |
+| **Phase 8** | Production Hardening (CI/CD GitHub Actions, Velopack packaging, release testing) | ✅ Complete |
 
 ---
 

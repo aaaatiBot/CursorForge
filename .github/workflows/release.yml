@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  package-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET 10 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Install Velopack CLI
+      run: dotnet tool install -g vpk
+
+    - name: Restore dependencies
+      run: dotnet restore CursorForge.slnx
+
+    - name: Publish desktop client
+      run: >
+        dotnet publish CursorForge.Client/CursorForge.Client.csproj
+        --configuration Release
+        --runtime win-x64
+        --self-contained false
+        -p:PublishReadyToRun=true
+        -p:PublishSingleFile=false
+        --output ./publish
+
+    - name: Package with Velopack
+      shell: pwsh
+      run: |
+        $version = "${{ github.ref_name }}".TrimStart('v')
+        vpk pack `
+          --packId "CursorForge" `
+          --packVersion $version `
+          --packDir "./publish" `
+          --packAuthors "aaaatiBot" `
+          --packTitle "CursorForge" `
+          --mainExe "CursorForge.Client.exe" `
+          --outputDir "./releases"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ./releases/*
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
