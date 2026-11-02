@@ -1,15 +1,137 @@
-﻿<UserControl x:Class="CursorForge.Client.Views.LibraryView"
+<UserControl x:Class="CursorForge.Client.Views.LibraryView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
-    <Grid Margin="24">
-        <StackPanel VerticalAlignment="Top">
-            <ui:TextBlock Text="Cursor Library" FontTypography="Title" Margin="0,0,0,8"/>
-            <ui:TextBlock Text="Local themes and bundled starter schemes." Appearance="Secondary" Margin="0,0,0,16"/>
-            <ui:CardControl Header="Offline Themes Ready" Margin="0,8,0,8">
-                <ui:TextBlock Text="Manage, preview, and apply your local cursor themes directly to Windows." Appearance="Secondary"/>
-            </ui:CardControl>
+    <Grid Margin="28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <ui:TextBlock Text="Cursor Library" FontTypography="Title" Margin="0,0,0,4"/>
+            <ui:TextBlock Text="Browse your installed themes or restore original Windows system cursors. Works fully offline."
+                          Appearance="Secondary"/>
         </StackPanel>
+
+        <!-- Controls Toolbar -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource ControlFillColorDefaultBrush}"
+                BorderBrush="{DynamicResource ControlElevationBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="16,12"
+                Margin="0,0,0,20">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                    <ui:Button Content="Apply Selected Theme"
+                               Icon="{ui:SymbolIcon Symbol=CheckmarkCircle24}"
+                               Appearance="Primary"
+                               Margin="0,0,10,0"
+                               Command="{Binding ApplySelectedThemeCommand}"/>
+                    <ui:Button Content="Refresh List"
+                               Icon="{ui:SymbolIcon Symbol=ArrowClockwise24}"
+                               Margin="0,0,10,0"
+                               Command="{Binding RefreshThemesCommand}"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <ui:Button Content="Restore Original"
+                               Icon="{ui:SymbolIcon Symbol=History24}"
+                               Margin="0,0,10,0"
+                               Command="{Binding RestoreOriginalBackupCommand}"/>
+                    <ui:Button Content="Reset to Windows Default"
+                               Icon="{ui:SymbolIcon Symbol=ArrowReset24}"
+                               Appearance="Secondary"
+                               Command="{Binding ResetToWindowsDefaultsCommand}"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Main Content Area: Theme List and Details -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="380"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Theme List -->
+            <Border Grid.Column="0"
+                    Background="{DynamicResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource ControlElevationBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="0,0,16,0">
+                <ListBox ItemsSource="{Binding Themes}"
+                         SelectedItem="{Binding SelectedTheme}"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         Padding="8">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="12,10" Margin="0,2" CornerRadius="6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="48"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Image Source="{Binding PreviewPath}"
+                                           Width="36" Height="36"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                        <ui:TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                        <ui:TextBlock Text="{Binding Author}" Appearance="Secondary" FontSize="12"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+
+            <!-- Theme Details / Preview -->
+            <Border Grid.Column="1"
+                    Background="{DynamicResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource ControlElevationBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="24">
+                <Grid>
+                    <StackPanel VerticalAlignment="Top" Visibility="{Binding SelectedTheme, Converter={StaticResource NullToVisibilityConverter}, FallbackValue=Visible}">
+                        <ui:TextBlock Text="{Binding SelectedTheme.Name}" FontTypography="Subtitle" Margin="0,0,0,4"/>
+                        <ui:TextBlock Text="{Binding SelectedTheme.Description}" Appearance="Secondary" Margin="0,0,0,16"/>
+
+                        <Separator Margin="0,8,0,16"/>
+
+                        <ui:TextBlock Text="Roles Included" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <ItemsControl ItemsSource="{Binding SelectedTheme.Roles}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource SubtlerFillColorSecondaryBrush}"
+                                            CornerRadius="6"
+                                            Padding="10,6"
+                                            Margin="0,0,8,8">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Cursor24" Margin="0,0,6,0"/>
+                                            <ui:TextBlock Text="{Binding Key}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <ui:TextBlock Text="{Binding StatusMessage}" Appearance="Secondary" Margin="0,24,0,0" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>
-

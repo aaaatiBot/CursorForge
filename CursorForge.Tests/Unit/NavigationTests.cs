@@ -16,7 +16,10 @@ public class NavigationTests
         _loggerMock = new Mock<IStructuredLogger>();
         _storageMock = new Mock<ILocalStorageService>();
 
-        var libraryVM = new LibraryViewModel();
+        var themeMgrMock = new Mock<IThemeManagerService>();
+        themeMgrMock.Setup(m => m.LoadAllThemes()).Returns([]);
+        var cursorServiceMock = new Mock<ISystemCursorService>();
+        var libraryVM = new LibraryViewModel(themeMgrMock.Object, cursorServiceMock.Object, _loggerMock.Object);
         var browseVM = new BrowseViewModel();
         var uploadVM = new UploadViewModel();
         var myCursorsVM = new MyCursorsViewModel();

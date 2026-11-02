@@ -38,6 +38,7 @@ public partial class App : Application
         services.AddSingleton<ILocalStorageService, LocalStorageService>();
         services.AddSingleton<ICursorConverterService, CursorConverterService>();
         services.AddSingleton<ISystemCursorService, SystemCursorService>();
+        services.AddSingleton<IThemeManagerService, ThemeManagerService>();
 
         // ViewModels
         services.AddSingleton<LibraryViewModel>();
