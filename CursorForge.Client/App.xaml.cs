@@ -14,23 +14,31 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        var serviceCollection = new ServiceCollection();
-        ConfigureServices(serviceCollection);
-        Services = serviceCollection.BuildServiceProvider();
+        try
+        {
+            var serviceCollection = new ServiceCollection();
+            ConfigureServices(serviceCollection);
+            Services = serviceCollection.BuildServiceProvider();
 
-        var logger = Services.GetRequiredService<IStructuredLogger>();
-        logger.LogInformation("app.startup", "CursorForge application starting up");
+            var logger = Services.GetRequiredService<IStructuredLogger>();
+            logger.LogInformation("app.startup", "CursorForge application starting up");
 
-        var storage = Services.GetRequiredService<ILocalStorageService>();
-        storage.CleanupStaleTempFiles();
+            var storage = Services.GetRequiredService<ILocalStorageService>();
+            storage.CleanupStaleTempFiles();
 
-        var systemCursors = Services.GetRequiredService<ISystemCursorService>();
-        systemCursors.CheckAndRecoverPendingApply();
+            var systemCursors = Services.GetRequiredService<ISystemCursorService>();
+            systemCursors.CheckAndRecoverPendingApply();
 
-        _ = Services.GetRequiredService<CursorForge.Client.Services.Supabase.ISupabaseClientService>().InitializeAsync();
+            _ = Services.GetRequiredService<CursorForge.Client.Services.Supabase.ISupabaseClientService>().InitializeAsync();
 
-        var mainWindow = Services.GetRequiredService<MainWindow>();
-        mainWindow.Show();
+            var mainWindow = Services.GetRequiredService<MainWindow>();
+            mainWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.ToString(), "CursorForge Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
+        }
     }
 
     private static void ConfigureServices(IServiceCollection services)

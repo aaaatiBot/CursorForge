@@ -1,4 +1,5 @@
-﻿using CursorForge.Client.Services;
+using System.IO;
+using CursorForge.Client.Services;
 using Velopack;
 
 namespace CursorForge.Client;
