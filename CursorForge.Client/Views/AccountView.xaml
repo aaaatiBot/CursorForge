@@ -79,7 +79,8 @@
 
                             <!-- Password Input -->
                             <ui:TextBlock Text="Password" FontTypography="BodyStrong" Margin="0,0,0,4"/>
-                            <ui:PasswordBox Password="{Binding PasswordInput, UpdateSourceTrigger=PropertyChanged}" 
+                            <ui:PasswordBox x:Name="AuthPasswordBox"
+                                            PasswordChanged="OnPasswordChanged" 
                                             PlaceholderText="Min 8 characters" 
                                             Margin="0,0,0,16"/>
 
@@ -164,7 +165,7 @@
                     <ui:TextBox Text="{Binding ResetRecoveryCode, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="XXXX-XXXX-XXXX-XXXX-XXXX" Margin="0,0,0,10"/>
 
                     <ui:TextBlock Text="New Password (min 8 chars)" FontTypography="BodyStrong" Margin="0,0,0,4"/>
-                    <ui:PasswordBox Password="{Binding ResetNewPassword, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,16"/>
+                    <ui:PasswordBox x:Name="ResetPasswordBox" PasswordChanged="OnResetPasswordChanged" Margin="0,0,0,16"/>
 
                     <!-- Rotated Recovery Key Notification (if success) -->
                     <StackPanel Visibility="{Binding NewRotatedRecoveryCode, Converter={StaticResource NullToVisibilityConverter}}" Margin="0,0,0,16">
