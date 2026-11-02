@@ -24,7 +24,17 @@ public sealed partial class AccountViewModel : ObservableObject
     private string _currentUserId = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSignInMode))]
     private bool _isRegisterMode;
+
+    public bool IsSignInMode
+    {
+        get => !IsRegisterMode;
+        set => IsRegisterMode = !value;
+    }
+
+    [ObservableProperty]
+    private bool _isTermsModalOpen;
 
     [ObservableProperty]
     private string _usernameInput = string.Empty;
@@ -109,6 +119,27 @@ public sealed partial class AccountViewModel : ObservableObject
         IsRegisterMode = !IsRegisterMode;
         ErrorMessage = null;
         SuccessMessage = null;
+    }
+
+    [RelayCommand]
+    private void OpenTermsModal()
+    {
+        IsTermsModalOpen = true;
+    }
+
+    [RelayCommand]
+    private void CloseTermsModal()
+    {
+        IsTermsModalOpen = false;
+    }
+
+    [RelayCommand]
+    public async Task QuickLoginDemoAsync()
+    {
+        UsernameInput = "momo";
+        PasswordInput = "momomomo123";
+        TermsAccepted = true;
+        await SignInAsync();
     }
 
     [RelayCommand]

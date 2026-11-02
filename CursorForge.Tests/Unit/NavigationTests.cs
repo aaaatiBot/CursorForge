@@ -21,6 +21,7 @@ public class NavigationTests
         var cursorServiceMock = new Mock<ISystemCursorService>();
         var libraryVM = new LibraryViewModel(themeMgrMock.Object, cursorServiceMock.Object, _loggerMock.Object);
         var supabaseMock = new Mock<CursorForge.Client.Services.Supabase.ISupabaseClientService>();
+        supabaseMock.Setup(s => s.IsAuthenticated).Returns(true);
         var browseVM = new BrowseViewModel(supabaseMock.Object, _loggerMock.Object);
         var uploadVM = new UploadViewModel(supabaseMock.Object, _loggerMock.Object);
         var myCursorsVM = new MyCursorsViewModel(supabaseMock.Object, _loggerMock.Object);
@@ -33,7 +34,8 @@ public class NavigationTests
             browseVM,
             uploadVM,
             myCursorsVM,
-            accountVM);
+            accountVM,
+            supabaseMock.Object);
     }
 
     [Fact]
@@ -41,6 +43,24 @@ public class NavigationTests
     {
         _mainViewModel.CurrentView.Should().BeOfType<LibraryViewModel>();
         _mainViewModel.IsBannerVisible.Should().BeFalse();
+    }
+
+    [Fact]
+    public void MainViewModel_WhenNotAuthenticated_InitializesWithAccountView()
+    {
+        var unauthedMock = new Mock<CursorForge.Client.Services.Supabase.ISupabaseClientService>();
+        unauthedMock.Setup(s => s.IsAuthenticated).Returns(false);
+        var vm = new MainViewModel(
+            _loggerMock.Object,
+            _storageMock.Object,
+            _mainViewModel.LibraryVM,
+            _mainViewModel.BrowseVM,
+            _mainViewModel.UploadVM,
+            _mainViewModel.MyCursorsVM,
+            _mainViewModel.AccountVM,
+            unauthedMock.Object);
+
+        vm.CurrentView.Should().BeOfType<AccountViewModel>();
     }
 
     [Theory]

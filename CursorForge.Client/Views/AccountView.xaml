@@ -63,12 +63,14 @@
                             <!-- Toggle Mode (Sign In vs Create Account) -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                                 <RadioButton Content="Sign In" 
-                                             IsChecked="{Binding IsRegisterMode, Converter={StaticResource InverseBoolToVis}}"
-                                             Command="{Binding ToggleModeCommand}"
-                                             Margin="0,0,16,0"/>
+                                             GroupName="AuthMode"
+                                             IsChecked="{Binding IsSignInMode, Mode=TwoWay}"
+                                             FontWeight="SemiBold"
+                                             Margin="0,0,24,0"/>
                                 <RadioButton Content="Create Account" 
-                                             IsChecked="{Binding IsRegisterMode, Converter={StaticResource BoolToVis}}"
-                                             Command="{Binding ToggleModeCommand}"/>
+                                             GroupName="AuthMode"
+                                             IsChecked="{Binding IsRegisterMode, Mode=TwoWay}"
+                                             FontWeight="SemiBold"/>
                             </StackPanel>
 
                             <!-- Username Input -->
@@ -86,9 +88,15 @@
 
                             <!-- Terms of Service (Registration only) -->
                             <StackPanel Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVis}}" Margin="0,0,0,16">
-                                <CheckBox IsChecked="{Binding TermsAccepted}" Margin="0,0,0,8">
-                                    <TextBlock Text="I accept the CursorForge Terms of Service and Privacy Policy" TextWrapping="Wrap"/>
-                                </CheckBox>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <CheckBox IsChecked="{Binding TermsAccepted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock VerticalAlignment="Center">
+                                        <Run Text="I accept the "/>
+                                        <Hyperlink Command="{Binding OpenTermsModalCommand}">
+                                            <Run Text="Terms of Service &amp; Privacy Policy"/>
+                                        </Hyperlink>
+                                    </TextBlock>
+                                </StackPanel>
                                 <ui:TextBlock Text="No email required. A 20-character single-use Crockford recovery key will be generated for account recovery." 
                                               Appearance="Tertiary" FontSize="11" TextWrapping="Wrap"/>
                             </StackPanel>
@@ -114,6 +122,15 @@
                                            Appearance="Transparent" 
                                            Command="{Binding OpenResetModalCommand}"
                                            Visibility="{Binding IsRegisterMode, Converter={StaticResource InverseBoolToVis}}"/>
+                            </StackPanel>
+
+                            <Separator Margin="0,20,0,16"/>
+
+                            <!-- Quick Login with Default Demo Account -->
+                            <StackPanel Orientation="Horizontal">
+                                <ui:Button Content="⚡ Quick Sign In as Default (momo)" 
+                                           Appearance="Secondary" 
+                                           Command="{Binding QuickLoginDemoCommand}"/>
                             </StackPanel>
                         </StackPanel>
                     </ui:CardControl>
@@ -181,6 +198,43 @@
                         <ui:Button Content="Reset Password" Appearance="Primary" Command="{Binding SubmitResetCommand}"/>
                     </StackPanel>
                 </StackPanel>
+            </ui:CardControl>
+        </Grid>
+
+        <!-- MODAL: Terms of Service & Privacy Policy Modal -->
+        <Grid Background="#B0000000" Visibility="{Binding IsTermsModalOpen, Converter={StaticResource BoolToVis}}">
+            <ui:CardControl MaxWidth="520" MaxHeight="550" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <ui:TextBlock Grid.Row="0" Text="CursorForge Terms &amp; Privacy Policy" FontTypography="Subtitle" Margin="0,0,0,12"/>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,0,0,16">
+                        <StackPanel>
+                            <ui:TextBlock Text="1. Privacy &amp; Data Collection" FontTypography="BodyStrong" Margin="0,0,0,4"/>
+                            <ui:TextBlock Text="CursorForge does NOT collect your real email address or real name. Your account is tied strictly to your chosen username. We do not track personal browsing habits or sell any user data." 
+                                          Appearance="Secondary" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                            <ui:TextBlock Text="2. Single-Use Recovery Keys" FontTypography="BodyStrong" Margin="0,0,0,4"/>
+                            <ui:TextBlock Text="Because no email is attached to your account, account recovery is handled exclusively by a 20-character cryptographic Crockford Base32 recovery key generated upon signup. We only store a salted SHA-256 hash of this key. If you lose your recovery key and password, your account cannot be recovered." 
+                                          Appearance="Secondary" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                            <ui:TextBlock Text="3. Local Security &amp; Windows DPAPI" FontTypography="BodyStrong" Margin="0,0,0,4"/>
+                            <ui:TextBlock Text="When you log in on this machine, your authorization tokens are encrypted on disk using the Windows Data Protection API (DPAPI). Only your specific Windows user profile can decrypt these credentials." 
+                                          Appearance="Secondary" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                            <ui:TextBlock Text="4. Community Publishing Guidelines" FontTypography="BodyStrong" Margin="0,0,0,4"/>
+                            <ui:TextBlock Text="When uploading cursor themes to the community catalog, you confirm that your artwork does not contain malicious code, copyright infringement, or harmful content. Uploaded public themes are shared freely with the CursorForge community." 
+                                          Appearance="Secondary" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <ui:Button Grid.Row="2" Content="Got It" Appearance="Primary" HorizontalAlignment="Right" Command="{Binding CloseTermsModalCommand}"/>
+                </Grid>
             </ui:CardControl>
         </Grid>
     </Grid>

@@ -31,7 +31,8 @@ public sealed partial class MainViewModel : ObservableObject
         BrowseViewModel browseVM,
         UploadViewModel uploadVM,
         MyCursorsViewModel myCursorsVM,
-        AccountViewModel accountVM)
+        AccountViewModel accountVM,
+        CursorForge.Client.Services.Supabase.ISupabaseClientService supabase)
     {
         _logger = logger;
         _storage = storage;
@@ -42,7 +43,22 @@ public sealed partial class MainViewModel : ObservableObject
         MyCursorsVM = myCursorsVM;
         AccountVM = accountVM;
 
-        _currentView = LibraryVM;
+        // If user is already authenticated (from DPAPI session), start on Library.
+        // Otherwise, start on Account (Sign In / Sign Up) first.
+        _currentView = supabase.IsAuthenticated ? LibraryVM : AccountVM;
+
+        // When user signs in or creates an account, automatically transition to Library
+        supabase.AuthStateChanged += (authenticated) =>
+        {
+            if (authenticated)
+            {
+                App.Current?.Dispatcher?.Invoke(() =>
+                {
+                    CurrentView = LibraryVM;
+                });
+            }
+        };
+
         _logger.LogInformation("app.initialized", "CursorForge MainViewModel initialized");
     }
 
