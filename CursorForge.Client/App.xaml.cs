@@ -27,6 +27,8 @@ public partial class App : Application
         var systemCursors = Services.GetRequiredService<ISystemCursorService>();
         systemCursors.CheckAndRecoverPendingApply();
 
+        _ = Services.GetRequiredService<CursorForge.Client.Services.Supabase.ISupabaseClientService>().InitializeAsync();
+
         var mainWindow = Services.GetRequiredService<MainWindow>();
         mainWindow.Show();
     }
@@ -36,6 +38,8 @@ public partial class App : Application
         // Core Singletons
         services.AddSingleton<IStructuredLogger, StructuredLogger>();
         services.AddSingleton<ILocalStorageService, LocalStorageService>();
+        services.AddSingleton<IDpapiTokenStorage, DpapiTokenStorage>();
+        services.AddSingleton<CursorForge.Client.Services.Supabase.ISupabaseClientService, CursorForge.Client.Services.Supabase.SupabaseClientService>();
         services.AddSingleton<ICursorConverterService, CursorConverterService>();
         services.AddSingleton<ISystemCursorService, SystemCursorService>();
         services.AddSingleton<IThemeManagerService, ThemeManagerService>();

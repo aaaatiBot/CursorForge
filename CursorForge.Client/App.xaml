@@ -10,6 +10,8 @@
                 <ui:ControlsDictionary />
             </ResourceDictionary.MergedDictionaries>
             <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
+            <converters:BooleanToVisibilityConverter x:Key="BoolToVis" />
+            <converters:BooleanToVisibilityConverter x:Key="InverseBoolToVis" Inverse="True" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

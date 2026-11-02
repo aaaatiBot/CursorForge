@@ -23,7 +23,8 @@ public class NavigationTests
         var browseVM = new BrowseViewModel();
         var uploadVM = new UploadViewModel();
         var myCursorsVM = new MyCursorsViewModel();
-        var accountVM = new AccountViewModel();
+        var supabaseMock = new Mock<CursorForge.Client.Services.Supabase.ISupabaseClientService>();
+        var accountVM = new AccountViewModel(supabaseMock.Object, _loggerMock.Object);
 
         _mainViewModel = new MainViewModel(
             _loggerMock.Object,

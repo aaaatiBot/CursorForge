@@ -1,4 +1,4 @@
-﻿namespace CursorForge.Client.Models;
+namespace CursorForge.Client.Models;
 
 public sealed class AppConfig
 {
@@ -6,5 +6,6 @@ public sealed class AppConfig
     public string SupabaseAnonKey { get; set; } = "your-supabase-anon-key";
     public int CacheLimitMb { get; set; } = 200;
     public string LogLevel { get; set; } = "Information";
+    public bool EnableRealtime { get; set; } = true;
 }
 
