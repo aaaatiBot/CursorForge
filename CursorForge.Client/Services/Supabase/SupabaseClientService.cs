@@ -620,4 +620,199 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             NextId = null
         };
     }
+
+    // =========================================================================
+    // Phase 7 - Upload & Creator Hub
+    // =========================================================================
+
+    public async Task<UploadSessionResult?> CreateUploadSessionAsync(string name, List<string> tags, List<string> roleNames)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Theme name is required.");
+        }
+
+        if (roleNames == null || roleNames.Count == 0)
+        {
+            throw new ArgumentException("At least one role is required.");
+        }
+
+        if (!IsConfigured || _supabase == null)
+        {
+            // Offline demo mode
+            var demoSession = new UploadSessionResult
+            {
+                SessionId = Guid.NewGuid(),
+                PreviewPath = $"mock_owner/{Guid.NewGuid()}/preview.png",
+                RolePaths = roleNames.ToDictionary(r => r, r => $"mock_owner/{Guid.NewGuid()}/{r}.png"),
+                ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+            };
+            return demoSession;
+        }
+
+        try
+        {
+            var rpcParams = new Dictionary<string, object>
+            {
+                { "p_name", name.Trim() },
+                { "p_tags", tags.ToArray() },
+                { "p_roles", roleNames.ToArray() }
+            };
+
+            var response = await _supabase.Rpc("create_upload_session", rpcParams);
+            if (response?.Content == null) return null;
+
+            return JsonSerializer.Deserialize<UploadSessionResult>(response.Content);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("upload.create_session_failed", "Failed to create upload session", ex);
+            return null;
+        }
+    }
+
+    public async Task<bool> ValidateUploadSessionAsync(Guid sessionId)
+    {
+        if (!IsConfigured || _supabase == null)
+        {
+            return true;
+        }
+
+        try
+        {
+            string endpoint = $"{_config.SupabaseUrl.TrimEnd('/')}/functions/v1/validate-upload";
+            var payload = new { session_id = sessionId.ToString() };
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            if (_currentSession?.AccessToken != null)
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _currentSession.AccessToken);
+            }
+            request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.SendAsync(request);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("upload.validation_failed", $"Failed calling validate-upload for session {sessionId}", ex);
+            return false;
+        }
+    }
+
+    public async Task<Guid?> CompleteUploadSessionAsync(Guid sessionId, Dictionary<string, HotspotCoord> hotspots)
+    {
+        if (!IsConfigured || _supabase == null)
+        {
+            return Guid.NewGuid();
+        }
+
+        try
+        {
+            var rpcParams = new Dictionary<string, object>
+            {
+                { "p_session_id", sessionId },
+                { "p_hotspots", hotspots }
+            };
+
+            var response = await _supabase.Rpc("complete_upload_session", rpcParams);
+            if (response?.Content == null) return null;
+
+            if (Guid.TryParse(response.Content.Trim('"', ' '), out var createdId))
+            {
+                return createdId;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("upload.complete_session_failed", $"Failed to complete upload session {sessionId}", ex);
+            return null;
+        }
+    }
+
+    public async Task<List<CursorItem>> GetMyCursorsAsync(CancellationToken ct = default)
+    {
+        if (_currentUser == null)
+        {
+            return [];
+        }
+
+        if (!IsConfigured || _supabase == null)
+        {
+            return
+            [
+                new CursorItem
+                {
+                    Id = Guid.NewGuid(),
+                    OwnerId = _currentUser.Id,
+                    OwnerUsername = _currentUser.Username,
+                    Title = "My Custom Neon Arrow",
+                    Description = "Personal theme draft.",
+                    Tags = ["Neon", "Custom"],
+                    Status = "approved",
+                    LikeCount = 12,
+                    DownloadCount = 45,
+                    CreatedAt = DateTime.UtcNow.AddDays(-1)
+                }
+            ];
+        }
+
+        try
+        {
+            var response = await _supabase
+                .From<DbCursor>()
+                .Select("*")
+                .Filter("owner_id", global::Supabase.Postgrest.Constants.Operator.Equals, _currentUser.Id.ToString())
+                .Order("created_at", global::Supabase.Postgrest.Constants.Ordering.Descending)
+                .Get(ct);
+
+            return (response.Models ?? []).Select(m => new CursorItem
+            {
+                Id = m.Id,
+                OwnerId = m.OwnerId,
+                OwnerUsername = _currentUser.Username,
+                Title = m.Title,
+                Description = m.Description,
+                Tags = m.Tags?.ToList() ?? [],
+                PreviewPath = m.PreviewPath,
+                PreviewUrl = GetPublicPreviewUrl(m.PreviewPath),
+                DownloadCount = m.DownloadCount,
+                LikeCount = m.LikeCount,
+                Status = m.Status,
+                CreatedAt = m.CreatedAt
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("mycursors.fetch_failed", "Failed to retrieve user cursors", ex);
+            return [];
+        }
+    }
+
+    public async Task<bool> RequestCursorDeletionAsync(Guid cursorId)
+    {
+        if (!IsConfigured || _supabase == null)
+        {
+            return true;
+        }
+
+        try
+        {
+            var rpcParams = new Dictionary<string, object>
+            {
+                { "p_cursor_id", cursorId }
+            };
+
+            await _supabase.Rpc("request_cursor_deletion", rpcParams);
+            _logger?.LogInformation("mycursors.deleted", $"Deletion requested for cursor: {cursorId}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("mycursors.delete_failed", $"Failed to delete cursor {cursorId}", ex);
+            return false;
+        }
+    }
 }

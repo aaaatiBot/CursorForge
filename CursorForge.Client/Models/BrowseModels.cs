@@ -73,3 +73,23 @@ public sealed class PagedResult<T>
     public DateTime? NextTimestamp { get; set; }
     public Guid? NextId { get; set; }
 }
+
+public sealed record HotspotCoord(
+    [property: JsonPropertyName("x")] int X,
+    [property: JsonPropertyName("y")] int Y
+);
+
+public sealed class UploadSessionResult
+{
+    [JsonPropertyName("session_id")]
+    public Guid SessionId { get; set; }
+
+    [JsonPropertyName("preview_path")]
+    public string PreviewPath { get; set; } = string.Empty;
+
+    [JsonPropertyName("role_paths")]
+    public Dictionary<string, string> RolePaths { get; set; } = [];
+
+    [JsonPropertyName("expires_at")]
+    public DateTime ExpiresAt { get; set; }
+}

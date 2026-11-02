@@ -28,4 +28,11 @@ public interface ISupabaseClientService
     Task<bool> LikeCursorAsync(Guid cursorId);
     Task<bool> UnlikeCursorAsync(Guid cursorId);
     Task<bool> IncrementDownloadAsync(Guid cursorId);
+
+    // Phase 7 - Upload & Creator Management
+    Task<UploadSessionResult?> CreateUploadSessionAsync(string name, List<string> tags, List<string> roleNames);
+    Task<bool> ValidateUploadSessionAsync(Guid sessionId);
+    Task<Guid?> CompleteUploadSessionAsync(Guid sessionId, Dictionary<string, HotspotCoord> hotspots);
+    Task<List<CursorItem>> GetMyCursorsAsync(CancellationToken ct = default);
+    Task<bool> RequestCursorDeletionAsync(Guid cursorId);
 }

@@ -22,8 +22,8 @@ public class NavigationTests
         var libraryVM = new LibraryViewModel(themeMgrMock.Object, cursorServiceMock.Object, _loggerMock.Object);
         var supabaseMock = new Mock<CursorForge.Client.Services.Supabase.ISupabaseClientService>();
         var browseVM = new BrowseViewModel(supabaseMock.Object, _loggerMock.Object);
-        var uploadVM = new UploadViewModel();
-        var myCursorsVM = new MyCursorsViewModel();
+        var uploadVM = new UploadViewModel(supabaseMock.Object, _loggerMock.Object);
+        var myCursorsVM = new MyCursorsViewModel(supabaseMock.Object, _loggerMock.Object);
         var accountVM = new AccountViewModel(supabaseMock.Object, _loggerMock.Object);
 
         _mainViewModel = new MainViewModel(
