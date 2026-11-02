@@ -1,0 +1,15 @@
+﻿<UserControl x:Class="CursorForge.Client.Views.LibraryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Grid Margin="24">
+        <StackPanel VerticalAlignment="Top">
+            <ui:TextBlock Text="Cursor Library" FontTypography="Title" Margin="0,0,0,8"/>
+            <ui:TextBlock Text="Local themes and bundled starter schemes." Appearance="Secondary" Margin="0,0,0,16"/>
+            <ui:CardControl Header="Offline Themes Ready" Margin="0,8,0,8">
+                <ui:TextBlock Text="Manage, preview, and apply your local cursor themes directly to Windows." Appearance="Secondary"/>
+            </ui:CardControl>
+        </StackPanel>
+    </Grid>
+</UserControl>
+

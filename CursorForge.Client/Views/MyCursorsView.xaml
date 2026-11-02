@@ -1,0 +1,15 @@
+﻿<UserControl x:Class="CursorForge.Client.Views.MyCursorsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Grid Margin="24">
+        <StackPanel VerticalAlignment="Top">
+            <ui:TextBlock Text="My Cursors" FontTypography="Title" Margin="0,0,0,8"/>
+            <ui:TextBlock Text="Manage your published and pending cursor themes." Appearance="Secondary" Margin="0,0,0,16"/>
+            <ui:CardControl Header="Theme Management" Margin="0,8,0,8">
+                <ui:TextBlock Text="View moderation status, edit metadata, or request deletion." Appearance="Secondary"/>
+            </ui:CardControl>
+        </StackPanel>
+    </Grid>
+</UserControl>
+

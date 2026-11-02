@@ -1,0 +1,15 @@
+﻿<UserControl x:Class="CursorForge.Client.Views.AccountView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Grid Margin="24">
+        <StackPanel VerticalAlignment="Top">
+            <ui:TextBlock Text="Account &amp; Security" FontTypography="Title" Margin="0,0,0,8"/>
+            <ui:TextBlock Text="Sign in or register using your username and secure Crockford recovery code." Appearance="Secondary" Margin="0,0,0,16"/>
+            <ui:CardControl Header="Security Status" Margin="0,8,0,8">
+                <ui:TextBlock Text="Tokens are encrypted using Windows DPAPI. No plain credentials stored." Appearance="Secondary"/>
+            </ui:CardControl>
+        </StackPanel>
+    </Grid>
+</UserControl>
+

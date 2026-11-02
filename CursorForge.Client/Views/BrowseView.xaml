@@ -1,0 +1,16 @@
+﻿<UserControl x:Class="CursorForge.Client.Views.BrowseView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Grid Margin="24">
+        <StackPanel VerticalAlignment="Top">
+            <ui:TextBlock Text="Browse Community" FontTypography="Title" Margin="0,0,0,8"/>
+            <ui:TextBlock Text="Discover and download cursor schemes created by the community." Appearance="Secondary" Margin="0,0,0,16"/>
+            <ui:TextBox PlaceholderText="Search cursors by name or tag..." Icon="{ui:SymbolIcon Symbol=Search24}" Margin="0,0,0,16"/>
+            <ui:CardControl Header="Community Grid" Margin="0,8,0,8">
+                <ui:TextBlock Text="Approved themes will be listed here with live stats and previews." Appearance="Secondary"/>
+            </ui:CardControl>
+        </StackPanel>
+    </Grid>
+</UserControl>
+

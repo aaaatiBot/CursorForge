@@ -1,0 +1,6 @@
+﻿{
+  "SupabaseUrl": "https://your-project-ref.supabase.co",
+  "SupabaseAnonKey": "your-supabase-anon-key",
+  "CacheLimitMb": 200,
+  "LogLevel": "Information"
+}

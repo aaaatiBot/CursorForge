@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CursorForge.Client/CursorForge.Client.csproj" />
+  <Project Path="CursorForge.Tests/CursorForge.Tests.csproj" />
+</Solution>

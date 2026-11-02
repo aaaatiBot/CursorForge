@@ -1,0 +1,135 @@
+<ui:FluentWindow x:Class="CursorForge.Client.Views.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:vm="clr-namespace:CursorForge.Client.ViewModels"
+                 xmlns:views="clr-namespace:CursorForge.Client.Views"
+                 Title="CursorForge"
+                 Height="750"
+                 Width="1100"
+                 MinHeight="600"
+                 MinWidth="800"
+                 WindowStartupLocation="CenterScreen"
+                 ExtendsContentIntoTitleBar="True">
+    <ui:FluentWindow.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <DataTemplate DataType="{x:Type vm:LibraryViewModel}">
+            <views:LibraryView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:BrowseViewModel}">
+            <views:BrowseView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:UploadViewModel}">
+            <views:UploadView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:MyCursorsViewModel}">
+            <views:MyCursorsView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:AccountViewModel}">
+            <views:AccountView/>
+        </DataTemplate>
+    </ui:FluentWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- TitleBar -->
+        <ui:TitleBar Grid.Row="0" Title="CursorForge"/>
+
+        <!-- Offline / Waking Banner -->
+        <Border Grid.Row="1"
+                Background="#1A0078D4"
+                BorderBrush="#0078D4"
+                BorderThickness="0,0,0,1"
+                Padding="12,8"
+                Visibility="{Binding IsBannerVisible, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ui:SymbolIcon Symbol="Info24" Grid.Column="0" Margin="0,0,8,0" Foreground="#0078D4"/>
+                <ui:TextBlock Text="{Binding BannerText}" Grid.Column="1" VerticalAlignment="Center"/>
+                <ui:Button Content="Dismiss" Grid.Column="2" Appearance="Transparent" Command="{Binding HideBannerCommand}"/>
+            </Grid>
+        </Border>
+
+        <!-- Navigation Rail & Content -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Navigation Rail -->
+            <Border Grid.Column="0"
+                    BorderBrush="{DynamicResource ControlElevationBorderBrush}"
+                    BorderThickness="0,0,1,0"
+                    Background="{DynamicResource LayerOnMicaAltFillColorDefaultBrush}">
+                <DockPanel Margin="12,16">
+                    <StackPanel DockPanel.Dock="Top">
+                        <ui:Button Content="Library"
+                                   Icon="{ui:SymbolIcon Symbol=Folder24}"
+                                   HorizontalAlignment="Stretch"
+                                   HorizontalContentAlignment="Left"
+                                   Margin="0,0,0,4"
+                                   Appearance="Secondary"
+                                   Command="{Binding NavigateCommand}"
+                                   CommandParameter="Library"/>
+
+                        <ui:Button Content="Browse"
+                                   Icon="{ui:SymbolIcon Symbol=Globe24}"
+                                   HorizontalAlignment="Stretch"
+                                   HorizontalContentAlignment="Left"
+                                   Margin="0,0,0,4"
+                                   Appearance="Secondary"
+                                   Command="{Binding NavigateCommand}"
+                                   CommandParameter="Browse"/>
+
+                        <ui:Button Content="Upload"
+                                   Icon="{ui:SymbolIcon Symbol=ArrowUpload24}"
+                                   HorizontalAlignment="Stretch"
+                                   HorizontalContentAlignment="Left"
+                                   Margin="0,0,0,4"
+                                   Appearance="Secondary"
+                                   Command="{Binding NavigateCommand}"
+                                   CommandParameter="Upload"/>
+
+                        <ui:Button Content="My Cursors"
+                                   Icon="{ui:SymbolIcon Symbol=AppsList24}"
+                                   HorizontalAlignment="Stretch"
+                                   HorizontalContentAlignment="Left"
+                                   Margin="0,0,0,4"
+                                   Appearance="Secondary"
+                                   Command="{Binding NavigateCommand}"
+                                   CommandParameter="MyCursors"/>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Bottom">
+                        <Separator Margin="0,8"/>
+                        <ui:Button Content="Account"
+                                   Icon="{ui:SymbolIcon Symbol=Person24}"
+                                   HorizontalAlignment="Stretch"
+                                   HorizontalContentAlignment="Left"
+                                   Appearance="Secondary"
+                                   Command="{Binding NavigateCommand}"
+                                   CommandParameter="Account"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- Main Content Area -->
+            <ScrollViewer Grid.Column="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ContentControl Content="{Binding CurrentView}"/>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>
+
