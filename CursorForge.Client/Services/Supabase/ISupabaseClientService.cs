@@ -14,6 +14,7 @@ public interface ISupabaseClientService
     Task<AuthResult> SignUpAsync(string emailOrUsername, string param2, string param3, bool termsAccepted);
     Task<AuthResult> SignUpAsync(string email, string username, string password, string? recoveryCode, bool termsAccepted);
     Task<AuthResult> SignInAsync(string usernameOrEmail, string password);
+    Task<AuthResult> SignInWithOAuthAsync(string providerName, CancellationToken cancellationToken = default);
     Task SignOutAsync();
     Task<PasswordResetResult> ResetPasswordAsync(string email);
     Task<PasswordResetResult> ResetPasswordAsync(string username, string recoveryCode, string newPassword);

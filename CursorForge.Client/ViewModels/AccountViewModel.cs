@@ -2,6 +2,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CursorForge.Client.Services;
+using CursorForge.Client.Services.Security;
 using CursorForge.Client.Services.Supabase;
 
 namespace CursorForge.Client.ViewModels;
@@ -183,6 +184,66 @@ public sealed partial class AccountViewModel : ObservableObject
         {
             _logger?.LogError("ui.signin_failed", "Sign in error", ex);
             ErrorMessage = "An unexpected error occurred.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private void GeneratePassword()
+    {
+        string generated = PasswordGenerator.Generate(16);
+        PasswordInput = generated;
+
+        try
+        {
+            Clipboard.SetText(generated);
+            SuccessMessage = "Generated strong password and copied to clipboard!";
+        }
+        catch
+        {
+            SuccessMessage = "Generated strong password!";
+        }
+    }
+
+    [RelayCommand]
+    private async Task SignInWithGoogleAsync()
+    {
+        await ExecuteOAuthSignInAsync("Google");
+    }
+
+    [RelayCommand]
+    private async Task SignInWithGitHubAsync()
+    {
+        await ExecuteOAuthSignInAsync("GitHub");
+    }
+
+    private async Task ExecuteOAuthSignInAsync(string provider)
+    {
+        if (IsBusy) return;
+
+        ErrorMessage = null;
+        SuccessMessage = null;
+        IsBusy = true;
+
+        try
+        {
+            var result = await _supabase.SignInWithOAuthAsync(provider);
+            if (!result.Success)
+            {
+                ErrorMessage = result.ErrorMessage ?? $"{provider} sign in failed.";
+            }
+            else
+            {
+                SuccessMessage = $"Signed in with {provider} successfully! Welcome to CursorForge.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("ui.oauth_failed", $"{provider} sign in error", ex);
+            ErrorMessage = $"An error occurred during {provider} sign in.";
         }
         finally
         {

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -406,6 +407,169 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             }
 
             _logger?.LogError("auth.signin_failed", $"Sign-in failed for {cleanIdentifier}", ex);
+            return new AuthResult(false, ex.Message);
+        }
+    }
+
+    public async Task<AuthResult> SignInWithOAuthAsync(string providerName, CancellationToken cancellationToken = default)
+    {
+        bool isGithub = providerName.Equals("github", StringComparison.OrdinalIgnoreCase);
+        string normalizedProvider = isGithub ? "GitHub" : "Google";
+
+        if (!IsConfigured || _supabase == null)
+        {
+            // Offline demo/mock mode
+            string mockUsername = isGithub ? "github_coder" : "google_creator";
+            string mockEmail = isGithub ? "coder@github.com" : "creator@gmail.com";
+
+            var mockUser = new AuthUser
+            {
+                Id = Guid.NewGuid(),
+                Username = mockUsername,
+                Email = mockEmail,
+                CreatedAt = DateTime.UtcNow
+            };
+            var mockSession = new AuthSession
+            {
+                AccessToken = $"mock_oauth_{normalizedProvider.ToLowerInvariant()}_" + Guid.NewGuid().ToString("N"),
+                RefreshToken = "mock_oauth_refresh_" + Guid.NewGuid().ToString("N"),
+                ExpiresAt = DateTime.UtcNow.AddDays(7),
+                User = mockUser
+            };
+
+            SetSession(mockSession);
+            _logger?.LogInformation("auth.oauth_offline", $"Logged in with mock {normalizedProvider} user: {mockUsername}");
+            return new AuthResult(true, null, mockSession);
+        }
+
+        using var loopback = new OAuthLoopbackServer();
+        try
+        {
+            var provider = isGithub ? global::Supabase.Gotrue.Constants.Provider.Github : global::Supabase.Gotrue.Constants.Provider.Google;
+            var signInOptions = new global::Supabase.Gotrue.SignInOptions
+            {
+                RedirectTo = loopback.RedirectUri
+            };
+
+            var authState = await _supabase.Auth.SignIn(provider, signInOptions);
+            if (authState?.Uri == null)
+            {
+                return new AuthResult(false, $"Failed to initialize {normalizedProvider} sign in.");
+            }
+
+            // Launch system browser
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = authState.Uri.ToString(),
+                    UseShellExecute = true
+                };
+                Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError("auth.oauth_browser_launch_failed", $"Could not open browser for {normalizedProvider}", ex);
+                return new AuthResult(false, "Could not open system browser for authentication.");
+            }
+
+            // Wait for redirect
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+            var callbackResult = await loopback.WaitForCallbackAsync(linkedCts.Token);
+            if (!callbackResult.Success)
+            {
+                return new AuthResult(false, callbackResult.ErrorMessage ?? $"{normalizedProvider} sign in failed.");
+            }
+
+            global::Supabase.Gotrue.Session? session = null;
+            if (!string.IsNullOrEmpty(callbackResult.Code))
+            {
+                session = await _supabase.Auth.ExchangeCodeForSession(authState.PKCEVerifier ?? string.Empty, callbackResult.Code);
+            }
+            else if (!string.IsNullOrEmpty(callbackResult.AccessToken))
+            {
+                session = await _supabase.Auth.SetSession(callbackResult.AccessToken, callbackResult.RefreshToken ?? string.Empty);
+            }
+
+            if (session?.User == null)
+            {
+                return new AuthResult(false, $"Authentication succeeded, but no user profile was returned by {normalizedProvider}.");
+            }
+
+            Guid userId = Guid.TryParse(session.User.Id, out var parsedId) ? parsedId : Guid.NewGuid();
+            string email = session.User.Email ?? string.Empty;
+
+            // Extract display name or username from provider metadata
+            string username = string.Empty;
+            if (session.User.UserMetadata != null)
+            {
+                if (session.User.UserMetadata.TryGetValue("user_name", out var unObj) && unObj != null)
+                {
+                    username = unObj.ToString() ?? string.Empty;
+                }
+                else if (session.User.UserMetadata.TryGetValue("full_name", out var fnObj) && fnObj != null)
+                {
+                    username = fnObj.ToString() ?? string.Empty;
+                }
+                else if (session.User.UserMetadata.TryGetValue("name", out var nameObj) && nameObj != null)
+                {
+                    username = nameObj.ToString() ?? string.Empty;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                username = !string.IsNullOrWhiteSpace(email) && email.Contains('@')
+                    ? email.Split('@')[0]
+                    : $"user_{Guid.NewGuid():N}"[..10];
+            }
+
+            // Sanitize username for public profile
+            username = Regex.Replace(username.ToLowerInvariant().Replace(' ', '_'), @"[^a-z0-9_]", "");
+            if (username.Length < 3) username = username.PadRight(3, '0');
+            if (username.Length > 30) username = username[..30];
+
+            var authUser = new AuthUser
+            {
+                Id = userId,
+                Username = username,
+                Email = email,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var appSession = new AuthSession
+            {
+                AccessToken = session.AccessToken ?? string.Empty,
+                RefreshToken = session.RefreshToken ?? string.Empty,
+                ExpiresAt = DateTime.UtcNow.AddSeconds(session.ExpiresIn > 0 ? session.ExpiresIn : 3600),
+                User = authUser
+            };
+
+            // Upsert profile in Supabase
+            try
+            {
+                var profile = new DbProfile
+                {
+                    Id = userId,
+                    Username = username,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _supabase.From<DbProfile>().Upsert(profile);
+            }
+            catch (Exception pEx)
+            {
+                _logger?.LogWarning("auth.profile_upsert", "Could not upsert public profile for OAuth user", pEx);
+            }
+
+            SetSession(appSession);
+            _logger?.LogInformation("auth.oauth_success", $"User successfully signed in with {normalizedProvider}: {username} ({email})");
+            return new AuthResult(true, null, appSession);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("auth.oauth_error", $"{normalizedProvider} authentication error", ex);
             return new AuthResult(false, ex.Message);
         }
     }

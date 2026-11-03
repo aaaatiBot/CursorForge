@@ -9,6 +9,33 @@ public partial class AccountView : UserControl
     public AccountView()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.OldValue is AccountViewModel oldVm)
+        {
+            oldVm.PropertyChanged -= OnViewModelPropertyChanged;
+        }
+        if (e.NewValue is AccountViewModel newVm)
+        {
+            newVm.PropertyChanged += OnViewModelPropertyChanged;
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (sender is AccountViewModel vm)
+        {
+            if (e.PropertyName == nameof(AccountViewModel.PasswordInput) && AuthPasswordBox != null)
+            {
+                if (AuthPasswordBox.Password != vm.PasswordInput)
+                {
+                    AuthPasswordBox.Password = vm.PasswordInput;
+                }
+            }
+        }
     }
 
     private void OnPasswordChanged(object sender, RoutedEventArgs e)
