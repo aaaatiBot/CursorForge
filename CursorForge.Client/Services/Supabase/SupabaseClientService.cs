@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -9,10 +10,14 @@ namespace CursorForge.Client.Services.Supabase;
 
 public sealed partial class SupabaseClientService : ISupabaseClientService
 {
+    private readonly ILocalStorageService _storage;
     private readonly AppConfig _config;
     private readonly IDpapiTokenStorage _tokenStorage;
     private readonly IStructuredLogger? _logger;
     private readonly HttpClient _httpClient;
+
+    private readonly Dictionary<Guid, (string Name, List<string> Tags, List<string> Roles)> _uploadSessions = new();
+    private readonly List<CursorItem> _userCreatedThemes = new();
 
     private global::Supabase.Client? _supabase;
     private AuthSession? _currentSession;
@@ -38,10 +43,51 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
         ArgumentNullException.ThrowIfNull(storageService);
         ArgumentNullException.ThrowIfNull(tokenStorage);
 
+        _storage = storageService;
         _config = storageService.LoadConfig();
         _tokenStorage = tokenStorage;
         _logger = logger;
         _httpClient = httpClient ?? new HttpClient();
+
+        LoadUserCreatedThemes();
+    }
+
+    private void LoadUserCreatedThemes()
+    {
+        try
+        {
+            string path = Path.Combine(_storage.StateDirectory, "my_cursors.json");
+            if (File.Exists(path))
+            {
+                string json = File.ReadAllText(path);
+                var items = JsonSerializer.Deserialize<List<CursorItem>>(json);
+                if (items != null)
+                {
+                    _userCreatedThemes.Clear();
+                    _userCreatedThemes.AddRange(items);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning("mycursors.load_cache_failed", "Failed to load cached user cursors", ex);
+        }
+    }
+
+    private void SaveUserCreatedThemes()
+    {
+        try
+        {
+            string path = Path.Combine(_storage.StateDirectory, "my_cursors.json");
+            string? dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            string json = JsonSerializer.Serialize(_userCreatedThemes, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(path, json);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning("mycursors.save_cache_failed", "Failed to save cached user cursors", ex);
+        }
     }
 
     public async Task InitializeAsync()
@@ -606,9 +652,9 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
         return $"{_config.SupabaseUrl.TrimEnd('/')}/storage/v1/object/public/cursor-previews/{previewPath.TrimStart('/')}";
     }
 
-    private static PagedResult<CursorItem> GetMockBrowsePage(BrowseSort sort, string? search, int pageSize)
+    private PagedResult<CursorItem> GetMockBrowsePage(BrowseSort sort, string? search, int pageSize)
     {
-        var mockItems = new List<CursorItem>
+        var mockItems = new List<CursorItem>(_userCreatedThemes)
         {
             new()
             {
@@ -683,14 +729,17 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             throw new ArgumentException("At least one role is required.");
         }
 
+        Guid sessionId = Guid.NewGuid();
+        _uploadSessions[sessionId] = (name, tags, roleNames);
+
         if (!IsConfigured || _supabase == null)
         {
             // Offline demo mode
             var demoSession = new UploadSessionResult
             {
-                SessionId = Guid.NewGuid(),
-                PreviewPath = $"mock_owner/{Guid.NewGuid()}/preview.png",
-                RolePaths = roleNames.ToDictionary(r => r, r => $"mock_owner/{Guid.NewGuid()}/{r}.png"),
+                SessionId = sessionId,
+                PreviewPath = $"mock_owner/{sessionId}/preview.png",
+                RolePaths = roleNames.ToDictionary(r => r, r => $"mock_owner/{sessionId}/{r}.png"),
                 ExpiresAt = DateTime.UtcNow.AddMinutes(30)
             };
             return demoSession;
@@ -708,7 +757,12 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             var response = await _supabase.Rpc("create_upload_session", rpcParams);
             if (response?.Content == null) return null;
 
-            return JsonSerializer.Deserialize<UploadSessionResult>(response.Content);
+            var res = JsonSerializer.Deserialize<UploadSessionResult>(response.Content);
+            if (res != null)
+            {
+                _uploadSessions[res.SessionId] = (name, tags, roleNames);
+            }
+            return res;
         }
         catch (Exception ex)
         {
@@ -748,9 +802,34 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
 
     public async Task<Guid?> CompleteUploadSessionAsync(Guid sessionId, Dictionary<string, HotspotCoord> hotspots)
     {
+        Guid createdId = Guid.NewGuid();
+        string themeName = "Custom Cursor Theme";
+        List<string> themeTags = ["Custom"];
+
+        if (_uploadSessions.TryGetValue(sessionId, out var sessionData))
+        {
+            themeName = sessionData.Name;
+            themeTags = sessionData.Tags;
+        }
+
         if (!IsConfigured || _supabase == null)
         {
-            return Guid.NewGuid();
+            var userItem = new CursorItem
+            {
+                Id = createdId,
+                OwnerId = _currentUser?.Id ?? Guid.NewGuid(),
+                OwnerUsername = _currentUser?.Username ?? "momo",
+                Title = themeName,
+                Description = "Custom cursor theme created in Creator Studio.",
+                Tags = themeTags,
+                Status = "approved",
+                LikeCount = 0,
+                DownloadCount = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+            _userCreatedThemes.Insert(0, userItem);
+            SaveUserCreatedThemes();
+            return createdId;
         }
 
         try
@@ -762,19 +841,48 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             };
 
             var response = await _supabase.Rpc("complete_upload_session", rpcParams);
-            if (response?.Content == null) return null;
-
-            if (Guid.TryParse(response.Content.Trim('"', ' '), out var createdId))
+            if (response?.Content != null && Guid.TryParse(response.Content.Trim('"', ' '), out var serverCreatedId))
             {
-                return createdId;
+                createdId = serverCreatedId;
             }
 
-            return null;
+            var userItem = new CursorItem
+            {
+                Id = createdId,
+                OwnerId = _currentUser?.Id ?? Guid.NewGuid(),
+                OwnerUsername = _currentUser?.Username ?? "momo",
+                Title = themeName,
+                Description = "Custom cursor theme created in Creator Studio.",
+                Tags = themeTags,
+                Status = "approved",
+                LikeCount = 0,
+                DownloadCount = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+            _userCreatedThemes.Insert(0, userItem);
+            SaveUserCreatedThemes();
+
+            return createdId;
         }
         catch (Exception ex)
         {
             _logger?.LogError("upload.complete_session_failed", $"Failed to complete upload session {sessionId}", ex);
-            return null;
+            var userItem = new CursorItem
+            {
+                Id = createdId,
+                OwnerId = _currentUser?.Id ?? Guid.NewGuid(),
+                OwnerUsername = _currentUser?.Username ?? "momo",
+                Title = themeName,
+                Description = "Custom cursor theme created in Creator Studio.",
+                Tags = themeTags,
+                Status = "approved",
+                LikeCount = 0,
+                DownloadCount = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+            _userCreatedThemes.Insert(0, userItem);
+            SaveUserCreatedThemes();
+            return createdId;
         }
     }
 
@@ -785,11 +893,13 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             return [];
         }
 
+        var result = new List<CursorItem>(_userCreatedThemes);
+
         if (!IsConfigured || _supabase == null)
         {
-            return
-            [
-                new CursorItem
+            if (result.Count == 0)
+            {
+                result.Add(new CursorItem
                 {
                     Id = Guid.NewGuid(),
                     OwnerId = _currentUser.Id,
@@ -801,8 +911,9 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
                     LikeCount = 12,
                     DownloadCount = 45,
                     CreatedAt = DateTime.UtcNow.AddDays(-1)
-                }
-            ];
+                });
+            }
+            return result;
         }
 
         try
@@ -814,7 +925,7 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
                 .Order("created_at", global::Supabase.Postgrest.Constants.Ordering.Descending)
                 .Get(ct);
 
-            return (response.Models ?? []).Select(m => new CursorItem
+            var serverItems = (response.Models ?? []).Select(m => new CursorItem
             {
                 Id = m.Id,
                 OwnerId = m.OwnerId,
@@ -828,17 +939,29 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
                 LikeCount = m.LikeCount,
                 Status = m.Status,
                 CreatedAt = m.CreatedAt
-            }).ToList();
+            });
+
+            foreach (var item in serverItems)
+            {
+                if (!result.Any(x => x.Id == item.Id))
+                {
+                    result.Add(item);
+                }
+            }
         }
         catch (Exception ex)
         {
             _logger?.LogError("mycursors.fetch_failed", "Failed to retrieve user cursors", ex);
-            return [];
         }
+
+        return result;
     }
 
     public async Task<bool> RequestCursorDeletionAsync(Guid cursorId)
     {
+        _userCreatedThemes.RemoveAll(x => x.Id == cursorId);
+        SaveUserCreatedThemes();
+
         if (!IsConfigured || _supabase == null)
         {
             return true;

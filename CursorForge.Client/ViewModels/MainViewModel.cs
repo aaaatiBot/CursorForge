@@ -75,6 +75,19 @@ public sealed partial class MainViewModel : ObservableObject
             "Account" => AccountVM,
             _ => LibraryVM
         };
+
+        if (viewName == "Library")
+        {
+            LibraryVM.RefreshThemes();
+        }
+        else if (viewName == "MyCursors")
+        {
+            _ = MyCursorsVM.LoadCursorsAsync();
+        }
+        else if (viewName == "Browse")
+        {
+            _ = BrowseVM.LoadInitialPageAsync();
+        }
     }
 
     public void ShowBanner(string message)

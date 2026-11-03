@@ -13,6 +13,7 @@ public interface IThemeManagerService
     string ExportTheme(string themeId, string destinationZipPath);
     LocalTheme ImportTheme(string sourceZipPath);
     void DeleteTheme(string themeId);
+    LocalTheme CreateThemeFromArtwork(string name, string? description, string? author, string pngPath, int hotspotX, int hotspotY);
 }
 
 public sealed class ThemeManagerService : IThemeManagerService
@@ -274,5 +275,52 @@ public sealed class ThemeManagerService : IThemeManagerService
             Directory.Delete(dir, recursive: true);
             _logger.LogInformation("theme.deleted", $"Deleted local theme '{themeId}'");
         }
+    }
+
+    public LocalTheme CreateThemeFromArtwork(string name, string? description, string? author, string pngPath, int hotspotX, int hotspotY)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Theme name cannot be empty.", nameof(name));
+        if (!File.Exists(pngPath))
+            throw new FileNotFoundException($"Artwork file not found at '{pngPath}'.", pngPath);
+
+        string cleanName = System.Text.RegularExpressions.Regex.Replace(name.ToLowerInvariant(), @"[^a-z0-9_]+", "_").Trim('_');
+        if (string.IsNullOrEmpty(cleanName)) cleanName = "custom_cursor";
+        string themeId = $"{cleanName}_{Guid.NewGuid():N}"[..Math.Min(32, cleanName.Length + 9)];
+
+        string themeDir = Path.Combine(_storage.ThemesDirectory, themeId);
+        Directory.CreateDirectory(themeDir);
+
+        string previewDest = Path.Combine(themeDir, "preview.png");
+        File.Copy(pngPath, previewDest, overwrite: true);
+
+        var roles = new Dictionary<string, LocalCursorRoleItem>();
+        foreach (var role in CursorRoleDefinition.StandardRoles)
+        {
+            string curDest = Path.Combine(themeDir, $"{role.RoleId}.cur");
+            _converter.ConvertPngToMultiSizeCurFile(pngPath, curDest, hotspotX, hotspotY);
+            roles[role.RoleId] = new LocalCursorRoleItem
+            {
+                FilePath = curDest,
+                HotspotX = hotspotX,
+                HotspotY = hotspotY
+            };
+        }
+
+        var localTheme = new LocalTheme
+        {
+            Id = themeId,
+            Name = name,
+            Description = description ?? "Custom created cursor theme",
+            Author = author ?? "You",
+            PreviewPath = previewDest,
+            Roles = roles
+        };
+
+        string json = JsonSerializer.Serialize(localTheme, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(Path.Combine(themeDir, "theme.json"), json);
+
+        _logger.LogInformation("theme.created", $"Created local theme '{name}' ({themeId}) from artwork '{pngPath}'");
+        return localTheme;
     }
 }

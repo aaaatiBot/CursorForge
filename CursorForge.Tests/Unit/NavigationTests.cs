@@ -38,6 +38,44 @@ public class NavigationTests
             supabaseMock.Object);
     }
 
+    [Theory]
+    [InlineData(typeof(CursorForge.Client.Views.LibraryView))]
+    [InlineData(typeof(CursorForge.Client.Views.BrowseView))]
+    [InlineData(typeof(CursorForge.Client.Views.UploadView))]
+    [InlineData(typeof(CursorForge.Client.Views.MyCursorsView))]
+    [InlineData(typeof(CursorForge.Client.Views.AccountView))]
+    public void AllViews_Instantiation_DoNotThrow(Type viewType)
+    {
+        Exception? caught = null;
+        var thread = new System.Threading.Thread(() =>
+        {
+            try
+            {
+                if (System.Windows.Application.Current == null)
+                {
+                    _ = new CursorForge.Client.App();
+                }
+                var view = Activator.CreateInstance(viewType);
+            }
+            catch (Exception ex)
+            {
+                caught = ex;
+            }
+            finally
+            {
+                System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown();
+            }
+        });
+        thread.SetApartmentState(System.Threading.ApartmentState.STA);
+        thread.Start();
+        thread.Join(5000);
+
+        if (caught != null)
+        {
+            throw new Exception($"{viewType.Name} threw: " + caught.ToString(), caught);
+        }
+    }
+
     [Fact]
     public void MainViewModel_InitializesWithLibraryView()
     {

@@ -164,6 +164,47 @@ public sealed class UploadAndManagementTests : IDisposable
     }
 
     [Fact]
+    public async Task UploadViewModel_Publish_PersistsToMyCursorsAndLocalLibrary()
+    {
+        await _supabase.SignInAsync("momo", "MomoSecretPassword123!");
+        var logger = new StructuredLogger(_storage.LogsDirectory);
+        var converter = new CursorConverterService();
+        var themeManager = new ThemeManagerService(_storage, converter, logger);
+
+        var vm = new UploadViewModel(_supabase, themeManager, logger);
+        string samplePng = Path.Combine(_testDir, "cat_cursor_128.png");
+        string srcPng = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "cat_cursor_128.png");
+        if (!File.Exists(srcPng))
+        {
+            srcPng = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "CursorForge.Client", "Assets", "cat_cursor_128.png"));
+        }
+        File.Copy(srcPng, samplePng, overwrite: true);
+
+        vm.LoadFile(samplePng);
+        vm.ThemeName = "Momo Cat Test";
+        vm.Description = "Cute cat cursor";
+        vm.TagsInput = "Cat, Pixel";
+        vm.HotspotX = 8;
+        vm.HotspotY = 8;
+
+        await vm.PublishAsync();
+
+        Assert.True(vm.IsSuccess);
+        Assert.NotNull(vm.PublishedThemeId);
+
+        // Verify it appears in My Cursors
+        var myCursors = await _supabase.GetMyCursorsAsync();
+        Assert.Contains(myCursors, c => c.Title == "Momo Cat Test");
+
+        // Verify it appears in local ThemeManager Library
+        var allThemes = themeManager.LoadAllThemes();
+        var installed = allThemes.FirstOrDefault(t => t.Name == "Momo Cat Test");
+        Assert.NotNull(installed);
+        Assert.True(installed.Roles.ContainsKey("Arrow"));
+        Assert.True(File.Exists(installed.Roles["Arrow"].FilePath));
+    }
+
+    [Fact]
     public async Task MyCursorsViewModel_DeleteCursor_RemovesItemFromCollection()
     {
         await _supabase.SignInAsync("creator_user", "ValidPassword123!");

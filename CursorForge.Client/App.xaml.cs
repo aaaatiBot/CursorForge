@@ -14,6 +14,31 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        DispatcherUnhandledException += (s, args) =>
+        {
+            try
+            {
+                var logger = Services?.GetService<IStructuredLogger>();
+                logger?.LogError("app.dispatcher_unhandled", args.Exception.Message, args.Exception);
+            }
+            catch { }
+            MessageBox.Show(args.Exception.Message, "CursorForge Notification", MessageBoxButton.OK, MessageBoxImage.Warning);
+            args.Handled = true;
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+        {
+            try
+            {
+                var logger = Services?.GetService<IStructuredLogger>();
+                if (args.ExceptionObject is Exception ex)
+                {
+                    logger?.LogError("app.domain_unhandled", ex.Message, ex);
+                }
+            }
+            catch { }
+        };
+
         try
         {
             var serviceCollection = new ServiceCollection();
