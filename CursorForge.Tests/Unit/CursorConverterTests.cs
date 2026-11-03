@@ -56,13 +56,13 @@ public class CursorConverterTests : IDisposable
     }
 
     [Fact]
-    public void ConvertPngToMultiSizeCur_GeneratesValidIconDir_With5Entries()
+    public void ConvertPngToMultiSizeCur_GeneratesValidIconDir_WithMultiSizeEntries()
     {
         byte[] pngBytes = CreateSamplePng(128, 128, Colors.Cyan);
         byte[] curBytes = _converter.ConvertPngToMultiSizeCur(pngBytes, hotspotX: 10, hotspotY: 20);
 
         curBytes.Should().NotBeNull();
-        curBytes.Length.Should().BeGreaterThan(6 + (16 * 5));
+        curBytes.Length.Should().BeGreaterThan(6 + (16 * CursorConverterService.TargetSizes.Length));
 
         using var ms = new MemoryStream(curBytes);
         using var reader = new BinaryReader(ms);
@@ -74,11 +74,11 @@ public class CursorConverterTests : IDisposable
 
         idReserved.Should().Be(0);
         idType.Should().Be(2); // CUR format
-        idCount.Should().Be(5); // 5 resolutions
+        idCount.Should().Be((ushort)CursorConverterService.TargetSizes.Length); // 6 resolutions: 32, 48, 64, 96, 128, 256
 
         // Directory entries
-        int[] expectedSizes = [32, 48, 64, 96, 128];
-        for (int i = 0; i < 5; i++)
+        int[] expectedSizes = CursorConverterService.TargetSizes;
+        for (int i = 0; i < expectedSizes.Length; i++)
         {
             byte bWidth = reader.ReadByte();
             byte bHeight = reader.ReadByte();
@@ -90,8 +90,9 @@ public class CursorConverterTests : IDisposable
             uint dwImageOffset = reader.ReadUInt32();
 
             int expectedSize = expectedSizes[i];
-            bWidth.Should().Be((byte)expectedSize);
-            bHeight.Should().Be((byte)expectedSize);
+            byte expectedDimByte = (byte)(expectedSize >= 256 ? 0 : expectedSize);
+            bWidth.Should().Be(expectedDimByte);
+            bHeight.Should().Be(expectedDimByte);
             bColorCount.Should().Be(0);
             bReserved.Should().Be(0);
 

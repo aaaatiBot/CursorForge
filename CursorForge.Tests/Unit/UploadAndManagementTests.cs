@@ -83,21 +83,21 @@ public sealed class UploadAndManagementTests : IDisposable
     [Fact]
     public void PngValidator_OversizedDimensions_Fails()
     {
-        byte[] huge = CreateValidPngBytes(256, 256);
+        byte[] huge = CreateValidPngBytes(5000, 5000);
         var result = PngValidator.ValidateBytes(huge);
 
         Assert.False(result.IsValid);
-        Assert.Contains("128x128", result.ErrorMessage);
+        Assert.Contains("4096x4096", result.ErrorMessage);
     }
 
     [Fact]
     public void PngValidator_OversizedByteSize_Fails()
     {
-        byte[] big = new byte[105 * 1024]; // 105 KB
+        byte[] big = new byte[26 * 1024 * 1024]; // 26 MB
         var result = PngValidator.ValidateBytes(big);
 
         Assert.False(result.IsValid);
-        Assert.Contains("100 KB", result.ErrorMessage);
+        Assert.Contains("25 MB", result.ErrorMessage);
     }
 
     [Fact]

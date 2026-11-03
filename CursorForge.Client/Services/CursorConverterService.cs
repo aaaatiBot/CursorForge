@@ -15,7 +15,7 @@ public interface ICursorConverterService
 
 public sealed class CursorConverterService : ICursorConverterService
 {
-    public static readonly int[] TargetSizes = [32, 48, 64, 96, 128];
+    public static readonly int[] TargetSizes = [32, 48, 64, 96, 128, 256];
     private const int BaseSize = 128;
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
@@ -96,8 +96,8 @@ public sealed class CursorConverterService : ICursorConverterService
         // 2. ICONDIRENTRY array (16 bytes per entry)
         foreach (var entry in resizedData)
         {
-            writer.Write((byte)entry.Size); // bWidth (128 is valid as 128)
-            writer.Write((byte)entry.Size); // bHeight
+            writer.Write((byte)(entry.Size >= 256 ? 0 : entry.Size)); // bWidth (256 is encoded as 0 per Win32 spec)
+            writer.Write((byte)(entry.Size >= 256 ? 0 : entry.Size)); // bHeight
             writer.Write((byte)0);          // bColorCount = 0 for 32bpp
             writer.Write((byte)0);          // bReserved = 0
             writer.Write(entry.HotspotX);   // wXHotspot

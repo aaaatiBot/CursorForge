@@ -13,7 +13,15 @@ public interface IThemeManagerService
     string ExportTheme(string themeId, string destinationZipPath);
     LocalTheme ImportTheme(string sourceZipPath);
     void DeleteTheme(string themeId);
-    LocalTheme CreateThemeFromArtwork(string name, string? description, string? author, string pngPath, int hotspotX, int hotspotY);
+    LocalTheme CreateThemeFromArtwork(
+        string name,
+        string? description,
+        string? author,
+        string pngPath,
+        int hotspotX,
+        int hotspotY,
+        int cursorBaseSize = 256,
+        string colorPalette = "Original");
 }
 
 public sealed class ThemeManagerService : IThemeManagerService
@@ -277,7 +285,15 @@ public sealed class ThemeManagerService : IThemeManagerService
         }
     }
 
-    public LocalTheme CreateThemeFromArtwork(string name, string? description, string? author, string pngPath, int hotspotX, int hotspotY)
+    public LocalTheme CreateThemeFromArtwork(
+        string name,
+        string? description,
+        string? author,
+        string pngPath,
+        int hotspotX,
+        int hotspotY,
+        int cursorBaseSize = 256,
+        string colorPalette = "Original")
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Theme name cannot be empty.", nameof(name));
@@ -292,19 +308,34 @@ public sealed class ThemeManagerService : IThemeManagerService
         Directory.CreateDirectory(themeDir);
 
         string previewDest = Path.Combine(themeDir, "preview.png");
-        File.Copy(pngPath, previewDest, overwrite: true);
+
+        // Normalize base image and generate cohesive 15-cursor bundle
+        var baseBitmap = CursorImageProcessor.LoadAndNormalizeImage(pngPath, 256);
+        var dominantColor = CursorImageProcessor.ExtractDominantColor(baseBitmap);
+        var bundle = CursorImageProcessor.GenerateSmartRoleBundle(baseBitmap, hotspotX, hotspotY, dominantColor, colorPalette);
 
         var roles = new Dictionary<string, LocalCursorRoleItem>();
-        foreach (var role in CursorRoleDefinition.StandardRoles)
+        foreach (var (roleId, roleResult) in bundle)
         {
-            string curDest = Path.Combine(themeDir, $"{role.RoleId}.cur");
-            _converter.ConvertPngToMultiSizeCurFile(pngPath, curDest, hotspotX, hotspotY);
-            roles[role.RoleId] = new LocalCursorRoleItem
+            string curDest = Path.Combine(themeDir, $"{roleId}.cur");
+            byte[] curBytes = _converter.ConvertPngToMultiSizeCur(roleResult.PngBytes, roleResult.HotspotX, roleResult.HotspotY);
+            File.WriteAllBytes(curDest, curBytes);
+
+            roles[roleId] = new LocalCursorRoleItem
             {
                 FilePath = curDest,
-                HotspotX = hotspotX,
-                HotspotY = hotspotY
+                HotspotX = roleResult.HotspotX,
+                HotspotY = roleResult.HotspotY
             };
+        }
+
+        if (bundle.TryGetValue("Arrow", out var arrowRole))
+        {
+            File.WriteAllBytes(previewDest, arrowRole.PngBytes);
+        }
+        else
+        {
+            File.Copy(pngPath, previewDest, overwrite: true);
         }
 
         var localTheme = new LocalTheme
@@ -314,13 +345,14 @@ public sealed class ThemeManagerService : IThemeManagerService
             Description = description ?? "Custom created cursor theme",
             Author = author ?? "You",
             PreviewPath = previewDest,
+            CursorBaseSize = cursorBaseSize,
             Roles = roles
         };
 
         string json = JsonSerializer.Serialize(localTheme, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(Path.Combine(themeDir, "theme.json"), json);
 
-        _logger.LogInformation("theme.created", $"Created local theme '{name}' ({themeId}) from artwork '{pngPath}'");
+        _logger.LogInformation("theme.created", $"Created local theme '{name}' ({themeId}) with 15 smart roles from artwork '{pngPath}'");
         return localTheme;
     }
 }

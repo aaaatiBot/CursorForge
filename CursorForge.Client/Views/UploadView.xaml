@@ -90,7 +90,7 @@
                                            HorizontalAlignment="Center"
                                            Command="{Binding SelectPngFileCommand}" 
                                            Margin="0,0,0,12"/>
-                                <ui:TextBlock Text="Requirements: PNG with transparency • Up to 128x128 px • File size under 100 KB" 
+                                <ui:TextBlock Text="Requirements: Any image (PNG, JPG, BMP) • Automatically normalized &amp; centered • Up to 256px Giant size" 
                                               Appearance="Tertiary" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
@@ -98,7 +98,7 @@
                         <!-- Selected File & Interactive Preview (Shown when file is loaded) -->
                         <StackPanel Visibility="{Binding HasSelectedFile, Converter={StaticResource BoolToVis}}">
                             <!-- File Info Bar -->
-                            <Border Background="#1AFFFFFF" CornerRadius="6" Padding="12,8" Margin="0,0,0,16">
+                            <Border Background="#1AFFFFFF" CornerRadius="6" Padding="12,10" Margin="0,0,0,12">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -108,7 +108,8 @@
                                     <ui:SymbolIcon Grid.Column="0" Symbol="Image24" FontSize="20" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding SelectedFileName}" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                        <TextBlock Text="{Binding SelectedFileInfoText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="11"/>
+                                        <TextBlock Text="{Binding SelectedFileInfoText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="11" Margin="0,2,0,2"/>
+                                        <TextBlock Text="{Binding NormalizedInfoText}" Foreground="#FF4CC2FF" FontSize="11" FontWeight="SemiBold"/>
                                     </StackPanel>
                                     <ui:Button Grid.Column="2" 
                                                Content="Change Image" 
@@ -116,6 +117,43 @@
                                                Command="{Binding SelectPngFileCommand}" 
                                                VerticalAlignment="Center"/>
                                 </Grid>
+                            </Border>
+
+                            <!-- Size & Palette Customization -->
+                            <Border Background="#10FFFFFF" CornerRadius="6" Padding="12,10" Margin="0,0,0,16">
+                                <StackPanel>
+                                    <!-- Pointer Size Selection -->
+                                    <ui:TextBlock Text="Pointer Size (Supports Native Giant 256px)" FontTypography="BodyStrong" Margin="0,0,0,6"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                        <ui:Button Content="Giant (256px)" 
+                                                   Command="{Binding SelectSizeCommand}"
+                                                   CommandParameter="256"/>
+                                        <ui:Button Content="Large (128px)" 
+                                                   Command="{Binding SelectSizeCommand}" 
+                                                   CommandParameter="128"
+                                                   Margin="6,0,0,0"/>
+                                        <ui:Button Content="Medium (64px)" 
+                                                   Command="{Binding SelectSizeCommand}" 
+                                                   CommandParameter="64"
+                                                   Margin="6,0,0,0"/>
+                                        <ui:Button Content="Standard (32px)" 
+                                                   Command="{Binding SelectSizeCommand}" 
+                                                   CommandParameter="32"
+                                                   Margin="6,0,0,0"/>
+                                    </StackPanel>
+
+                                    <!-- Color Palette Selection -->
+                                    <ui:TextBlock Text="Theme Color Palette Shift" FontTypography="BodyStrong" Margin="0,0,0,6"/>
+                                    <WrapPanel Margin="0,0,0,4">
+                                        <ui:Button Content="Original" Command="{Binding SelectPaletteCommand}" CommandParameter="Original" Margin="0,0,6,6"/>
+                                        <ui:Button Content="Neon Cyan" Command="{Binding SelectPaletteCommand}" CommandParameter="Neon Cyan" Margin="0,0,6,6"/>
+                                        <ui:Button Content="Cyber Gold" Command="{Binding SelectPaletteCommand}" CommandParameter="Cyber Gold" Margin="0,0,6,6"/>
+                                        <ui:Button Content="Rose Pink" Command="{Binding SelectPaletteCommand}" CommandParameter="Rose Pink" Margin="0,0,6,6"/>
+                                        <ui:Button Content="Royal Violet" Command="{Binding SelectPaletteCommand}" CommandParameter="Royal Violet" Margin="0,0,6,6"/>
+                                        <ui:Button Content="Emerald Mint" Command="{Binding SelectPaletteCommand}" CommandParameter="Emerald Mint" Margin="0,0,6,6"/>
+                                        <ui:Button Content="Midnight Stealth" Command="{Binding SelectPaletteCommand}" CommandParameter="Midnight Stealth" Margin="0,0,6,6"/>
+                                    </WrapPanel>
+                                </StackPanel>
                             </Border>
 
                             <!-- Interactive Artwork Preview with Click-To-Hotspot -->
@@ -127,7 +165,7 @@
 
                                 <!-- Visual Preview Box -->
                                 <Border Grid.Column="0" 
-                                        Width="150" Height="150" 
+                                        Width="160" Height="160" 
                                         Background="#15171C" 
                                         BorderBrush="#33FFFFFF" 
                                         BorderThickness="1" 
@@ -139,8 +177,8 @@
                                         <Image Source="{Binding SelectedPngPath}" 
                                                Width="{Binding ImageWidth}" 
                                                Height="{Binding ImageHeight}" 
-                                               Stretch="None" 
-                                               RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                               Stretch="Uniform" 
+                                               RenderOptions.BitmapScalingMode="HighQuality"/>
 
                                         <!-- Hotspot Overlay Canvas (Clickable) -->
                                         <Canvas Width="{Binding ImageWidth}" 
@@ -149,8 +187,8 @@
                                                 Cursor="Cross"
                                                 MouseLeftButtonDown="OnPreviewCanvasMouseLeftButtonDown">
                                             <!-- Hotspot Marker Circle -->
-                                            <Ellipse Width="11" Height="11" 
-                                                     Margin="-5,-5,0,0" 
+                                            <Ellipse Width="13" Height="13" 
+                                                     Margin="-6,-6,0,0" 
                                                      Stroke="#FFFF3366" 
                                                      StrokeThickness="2" 
                                                      Fill="#88FF3366" 
@@ -191,8 +229,8 @@
                                     <StackPanel Orientation="Horizontal">
                                         <ui:TextBlock Text="Presets: " VerticalAlignment="Center" Appearance="Tertiary" FontSize="11" Margin="0,0,6,0"/>
                                         <ui:Button Content="Top-Left (0, 0)" Appearance="Transparent" Command="{Binding SetHotspotCommand}" CommandParameter="0,0" Margin="0,0,4,0"/>
-                                        <ui:Button Content="Arrow Tip (8, 8)" Appearance="Transparent" Command="{Binding SetHotspotCommand}" CommandParameter="8,8" Margin="0,0,4,0"/>
-                                        <ui:Button Content="Center (16, 16)" Appearance="Transparent" Command="{Binding SetHotspotCommand}" CommandParameter="16,16"/>
+                                        <ui:Button Content="Tip (16, 16)" Appearance="Transparent" Command="{Binding SetHotspotCommand}" CommandParameter="16,16" Margin="0,0,4,0"/>
+                                        <ui:Button Content="Center (128, 128)" Appearance="Transparent" Command="{Binding SetHotspotCommand}" CommandParameter="128,128"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Grid>
@@ -200,7 +238,37 @@
                     </StackPanel>
                 </ui:CardControl>
 
-                <!-- Step 3: Publish Button -->
+                <!-- Step 3: AI Smart Theme Bundle Preview -->
+                <ui:CardControl Margin="0,0,0,16" Visibility="{Binding HasSelectedFile, Converter={StaticResource BoolToVis}}">
+                    <StackPanel Margin="12">
+                        <ui:TextBlock Text="3. Smart Theme Bundle (15 Windows Cursors)" FontTypography="Subtitle" Margin="0,0,0,4"/>
+                        <ui:TextBlock Text="Automatically generated cohesive cursor scheme with dedicated role graphics and precision hotspots." 
+                                      Appearance="Secondary" Margin="0,0,0,16"/>
+
+                        <ItemsControl ItemsSource="{Binding GeneratedRoles}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Width="118" Margin="0,0,10,10" Padding="8" Background="#15171C" BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="6">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <Border Width="56" Height="56" Background="#1E2028" CornerRadius="4" Margin="0,0,0,6">
+                                                <Image Source="{Binding PreviewImage}" Width="44" Height="44" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                            </Border>
+                                            <TextBlock Text="{Binding DisplayName}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding RoleId}" FontSize="9" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ui:CardControl>
+
+                <!-- Step 4: Publish Button -->
                 <StackPanel Margin="0,8,0,32">
                     <ProgressBar IsIndeterminate="True" 
                                  Height="4" 

@@ -1,4 +1,7 @@
+using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CursorForge.Client.Models;
@@ -8,11 +11,22 @@ using Microsoft.Win32;
 
 namespace CursorForge.Client.ViewModels;
 
+public sealed class SmartRolePreviewItem
+{
+    public required string RoleId { get; init; }
+    public required string DisplayName { get; init; }
+    public required BitmapSource PreviewImage { get; init; }
+    public required int HotspotX { get; init; }
+    public required int HotspotY { get; init; }
+}
+
 public sealed partial class UploadViewModel : ObservableObject
 {
     private readonly ISupabaseClientService _supabase;
     private readonly IThemeManagerService? _themeManager;
     private readonly IStructuredLogger? _logger;
+    private BitmapSource? _rawNormalizedBitmap;
+    private Color _dominantColor = Color.FromRgb(0x4C, 0xC2, 0xFF);
 
     [ObservableProperty]
     private string _title = "Creator Studio";
@@ -39,6 +53,9 @@ public sealed partial class UploadViewModel : ObservableObject
     private string? _selectedFileInfoText;
 
     [ObservableProperty]
+    private string? _normalizedInfoText;
+
+    [ObservableProperty]
     private bool _hasSelectedFile;
 
     [ObservableProperty]
@@ -52,6 +69,12 @@ public sealed partial class UploadViewModel : ObservableObject
 
     [ObservableProperty]
     private int _hotspotY;
+
+    [ObservableProperty]
+    private int _selectedPointerSize = 256;
+
+    [ObservableProperty]
+    private string _selectedPalette = "Original";
 
     [ObservableProperty]
     private bool _isUploading;
@@ -68,6 +91,11 @@ public sealed partial class UploadViewModel : ObservableObject
     [ObservableProperty]
     private string? _publishedThemeId;
 
+    public IReadOnlyList<string> AvailablePalettes => CursorImageProcessor.AvailablePalettes;
+    public IReadOnlyList<int> AvailableSizes { get; } = [256, 128, 64, 32];
+
+    public ObservableCollection<SmartRolePreviewItem> GeneratedRoles { get; } = [];
+
     public UploadViewModel(ISupabaseClientService supabase, IStructuredLogger? logger)
         : this(supabase, null, logger)
     {
@@ -83,13 +111,39 @@ public sealed partial class UploadViewModel : ObservableObject
         _logger = logger;
     }
 
+    partial void OnSelectedPaletteChanged(string value)
+    {
+        if (_rawNormalizedBitmap != null)
+        {
+            RefreshSmartRolesBundle();
+        }
+    }
+
+    [RelayCommand]
+    public void SelectPalette(string palette)
+    {
+        if (!string.IsNullOrWhiteSpace(palette))
+        {
+            SelectedPalette = palette;
+        }
+    }
+
+    [RelayCommand]
+    public void SelectSize(object? param)
+    {
+        if (param != null && int.TryParse(param.ToString(), out int size) && size > 0)
+        {
+            SelectedPointerSize = size;
+        }
+    }
+
     [RelayCommand]
     public void SelectPngFile()
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "PNG Image (*.png)|*.png",
-            Title = "Select Primary Cursor Artwork (PNG)"
+            Filter = "Images (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp|PNG Image (*.png)|*.png",
+            Title = "Select Primary Cursor Artwork"
         };
 
         if (dialog.ShowDialog() == true)
@@ -105,7 +159,10 @@ public sealed partial class UploadViewModel : ObservableObject
         SelectedFileName = null;
         SelectedFileSizeText = null;
         SelectedFileInfoText = null;
+        NormalizedInfoText = null;
         HasSelectedFile = false;
+        _rawNormalizedBitmap = null;
+        GeneratedRoles.Clear();
         ImageWidth = 0;
         ImageHeight = 0;
         HotspotX = 0;
@@ -133,28 +190,84 @@ public sealed partial class UploadViewModel : ObservableObject
             return;
         }
 
-        SelectedPngPath = path;
-        SelectedFileName = Path.GetFileName(path);
-        var fileInfo = new FileInfo(path);
-        SelectedFileSizeText = $"{(fileInfo.Length / 1024.0):F1} KB";
-        ImageWidth = validation.Width;
-        ImageHeight = validation.Height;
-        HasSelectedFile = true;
-        SelectedFileInfoText = $"{ImageWidth}x{ImageHeight} px  •  {SelectedFileSizeText}  •  Valid Transparent PNG";
-
-        if (string.IsNullOrWhiteSpace(ThemeName))
+        try
         {
-            string baseName = Path.GetFileNameWithoutExtension(path)
-                .Replace("_", " ")
-                .Replace("-", " ");
-            ThemeName = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(baseName);
+            // Normalize any dimension/aspect ratio to 256x256 square
+            var normalized = CursorImageProcessor.LoadAndNormalizeImage(path, 256);
+            _rawNormalizedBitmap = normalized;
+            _dominantColor = CursorImageProcessor.ExtractDominantColor(normalized);
+
+            // Save normalized PNG to temp cache so preview and converter use the clean square canvas
+            string tempDir = Path.Combine(Path.GetTempPath(), "CursorForge_Normalized");
+            Directory.CreateDirectory(tempDir);
+            string cachedNormPath = Path.Combine(tempDir, $"{Guid.NewGuid():N}.png");
+            File.WriteAllBytes(cachedNormPath, CursorImageProcessor.EncodeToPngBytes(normalized));
+
+            SelectedPngPath = cachedNormPath;
+            SelectedFileName = Path.GetFileName(path);
+            var fileInfo = new FileInfo(path);
+            SelectedFileSizeText = $"{(fileInfo.Length / 1024.0):F1} KB";
+            ImageWidth = normalized.PixelWidth;
+            ImageHeight = normalized.PixelHeight;
+            HasSelectedFile = true;
+
+            SelectedFileInfoText = $"{validation.Width}x{validation.Height} px original  •  {SelectedFileSizeText}";
+            NormalizedInfoText = $"✨ Auto-fit to {ImageWidth}x{ImageHeight} px square canvas with transparent background.";
+
+            if (string.IsNullOrWhiteSpace(ThemeName))
+            {
+                string baseName = Path.GetFileNameWithoutExtension(path)
+                    .Replace("_", " ")
+                    .Replace("-", " ");
+                ThemeName = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(baseName);
+            }
+
+            // Default hotspot
+            HotspotX = 0;
+            HotspotY = 0;
+
+            RefreshSmartRolesBundle();
+
+            StatusMessage = $"Artwork loaded & normalized to {ImageWidth}x{ImageHeight} px. 15 cursor roles automatically generated!";
         }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning("upload.normalize_warning", $"Fallback to raw image file: {ex.Message}");
+            SelectedPngPath = path;
+            SelectedFileName = Path.GetFileName(path);
+            var fileInfo = new FileInfo(path);
+            SelectedFileSizeText = $"{(fileInfo.Length / 1024.0):F1} KB";
+            ImageWidth = validation.Width > 0 ? validation.Width : 128;
+            ImageHeight = validation.Height > 0 ? validation.Height : 128;
+            HasSelectedFile = true;
+            SelectedFileInfoText = $"{ImageWidth}x{ImageHeight} px  •  {SelectedFileSizeText}";
+            StatusMessage = $"Loaded {SelectedFileName}.";
+        }
+    }
 
-        // Default hotspot within bounds
-        HotspotX = Math.Clamp(HotspotX, 0, Math.Max(0, ImageWidth - 1));
-        HotspotY = Math.Clamp(HotspotY, 0, Math.Max(0, ImageHeight - 1));
+    private void RefreshSmartRolesBundle()
+    {
+        if (_rawNormalizedBitmap == null) return;
 
-        StatusMessage = $"Loaded {SelectedFileName} ({ImageWidth}x{ImageHeight} px, {SelectedFileSizeText}). Ready to position hotspot.";
+        GeneratedRoles.Clear();
+        var bundle = CursorImageProcessor.GenerateSmartRoleBundle(
+            _rawNormalizedBitmap,
+            HotspotX,
+            HotspotY,
+            _dominantColor,
+            SelectedPalette);
+
+        foreach (var (_, role) in bundle)
+        {
+            GeneratedRoles.Add(new SmartRolePreviewItem
+            {
+                RoleId = role.RoleId,
+                DisplayName = role.DisplayName,
+                PreviewImage = role.Bitmap,
+                HotspotX = role.HotspotX,
+                HotspotY = role.HotspotY
+            });
+        }
     }
 
     [RelayCommand]
@@ -166,6 +279,7 @@ public sealed partial class UploadViewModel : ObservableObject
         {
             HotspotX = Math.Clamp(x, 0, Math.Max(0, ImageWidth - 1));
             HotspotY = Math.Clamp(y, 0, Math.Max(0, ImageHeight - 1));
+            RefreshSmartRolesBundle();
         }
     }
 
@@ -204,7 +318,7 @@ public sealed partial class UploadViewModel : ObservableObject
         }
 
         IsUploading = true;
-        StatusMessage = "Processing cursor artwork and creating theme...";
+        StatusMessage = "Generating complete 15-cursor scheme bundle and publishing...";
 
         try
         {
@@ -215,7 +329,7 @@ public sealed partial class UploadViewModel : ObservableObject
                 .ToList();
             if (tags.Count == 0) tags.Add("Custom");
 
-            var roleNames = new List<string> { "Arrow", "Hand", "IBeam", "Wait" };
+            var roleNames = CursorRoleDefinition.StandardRoles.Select(r => r.RoleId).ToList();
 
             // 1. Create upload session
             var session = await _supabase.CreateUploadSessionAsync(ThemeName, tags, roleNames);
@@ -234,7 +348,12 @@ public sealed partial class UploadViewModel : ObservableObject
             }
 
             // 3. Complete session in cloud/catalog
-            var hotspots = roleNames.ToDictionary(r => r, _ => new HotspotCoord(HotspotX, HotspotY));
+            var hotspots = roleNames.ToDictionary(
+                r => r,
+                r => (r == "Arrow" || r == "Help" || r == "AppStarting" || r == "No")
+                    ? new HotspotCoord(HotspotX, HotspotY)
+                    : new HotspotCoord(ImageWidth / 2, ImageHeight / 2));
+
             var createdId = await _supabase.CompleteUploadSessionAsync(session.SessionId, hotspots);
 
             if (!createdId.HasValue)
@@ -243,13 +362,21 @@ public sealed partial class UploadViewModel : ObservableObject
                 return;
             }
 
-            // 4. Also register and compile into local Library so it is immediately usable on Windows
+            // 4. Register and compile full 15-cursor bundle into local Library
             if (_themeManager != null && !string.IsNullOrEmpty(SelectedPngPath))
             {
                 try
                 {
                     var author = _supabase.CurrentUser?.Username ?? "You";
-                    var localTheme = _themeManager.CreateThemeFromArtwork(ThemeName, Description, author, SelectedPngPath, HotspotX, HotspotY);
+                    var localTheme = _themeManager.CreateThemeFromArtwork(
+                        ThemeName,
+                        Description,
+                        author,
+                        SelectedPngPath,
+                        HotspotX,
+                        HotspotY,
+                        SelectedPointerSize,
+                        SelectedPalette);
                     PublishedThemeId = localTheme.Id;
                 }
                 catch (Exception ex)
@@ -259,8 +386,8 @@ public sealed partial class UploadViewModel : ObservableObject
             }
 
             IsSuccess = true;
-            StatusMessage = $"Theme '{ThemeName}' successfully published! It is now visible in 'My Cursors' and installed in your 'Library'.";
-            _logger?.LogInformation("upload.success", $"Published theme {createdId.Value}");
+            StatusMessage = $"Theme '{ThemeName}' ({SelectedPointerSize}px, {SelectedPalette}) successfully published! 15 custom cursors installed to your Library.";
+            _logger?.LogInformation("upload.success", $"Published theme {createdId.Value} with 15 smart roles");
         }
         catch (Exception ex)
         {

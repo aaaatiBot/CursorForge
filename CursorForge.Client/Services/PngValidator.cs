@@ -7,8 +7,8 @@ public readonly record struct PngValidationResult(bool IsValid, string? ErrorMes
 public static class PngValidator
 {
     private static readonly byte[] PngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-    public const int MaxByteSize = 100 * 1024; // 100 KB
-    public const int MaxDimension = 128;
+    public const int MaxByteSize = 25 * 1024 * 1024; // 25 MB
+    public const int MaxDimension = 4096; // Up to 4K resolution
 
     public static PngValidationResult ValidateFile(string filePath)
     {
@@ -20,7 +20,7 @@ public static class PngValidator
         var fi = new FileInfo(filePath);
         if (fi.Length > MaxByteSize)
         {
-            return new PngValidationResult(false, $"File size ({fi.Length / 1024} KB) exceeds maximum 100 KB limit.");
+            return new PngValidationResult(false, $"File size ({fi.Length / (1024 * 1024)} MB) exceeds maximum 25 MB limit.");
         }
         if (fi.Length < 24)
         {
@@ -40,7 +40,7 @@ public static class PngValidator
 
         if (bytes.Length > MaxByteSize)
         {
-            return new PngValidationResult(false, $"File size exceeds 100 KB limit.");
+            return new PngValidationResult(false, $"File size exceeds 25 MB limit.");
         }
 
         // Verify PNG magic header

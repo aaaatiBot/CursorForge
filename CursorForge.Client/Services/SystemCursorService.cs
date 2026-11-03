@@ -272,6 +272,11 @@ public sealed class SystemCursorService : ISystemCursorService
 
             key.SetValue(string.Empty, theme.Name, RegistryValueKind.String);
 
+            if (theme.CursorBaseSize.HasValue && theme.CursorBaseSize.Value > 0)
+            {
+                key.SetValue("CursorBaseSize", theme.CursorBaseSize.Value, RegistryValueKind.DWord);
+            }
+
             // Register in HKCU\Control Panel\Cursors\Schemes
             RegisterScheme(theme);
 

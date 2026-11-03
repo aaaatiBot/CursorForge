@@ -14,5 +14,6 @@ public sealed class LocalTheme
     public string? Description { get; set; }
     public string? Author { get; set; }
     public string? PreviewPath { get; set; }
+    public int? CursorBaseSize { get; set; }
     public Dictionary<string, LocalCursorRoleItem> Roles { get; set; } = [];
 }
