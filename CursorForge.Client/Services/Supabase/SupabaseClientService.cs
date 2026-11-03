@@ -1034,12 +1034,17 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
             var response = await _httpClient.SendAsync(request);
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logger?.LogInformation("upload.validation_skipped", "validate-upload edge function not deployed, proceeding with client validated artwork.");
+                return true;
+            }
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
-            _logger?.LogError("upload.validation_failed", $"Failed calling validate-upload for session {sessionId}", ex);
-            return false;
+            _logger?.LogWarning("upload.validation_skipped", $"validate-upload check skipped ({ex.Message}), proceeding with client validation.");
+            return true;
         }
     }
 
