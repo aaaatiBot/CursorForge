@@ -11,9 +11,11 @@ public interface ISupabaseClientService
     event Action<bool>? AuthStateChanged;
 
     Task InitializeAsync();
-    Task<AuthResult> SignUpAsync(string username, string password, string recoveryCode, bool termsAccepted);
-    Task<AuthResult> SignInAsync(string username, string password);
+    Task<AuthResult> SignUpAsync(string emailOrUsername, string param2, string param3, bool termsAccepted);
+    Task<AuthResult> SignUpAsync(string email, string username, string password, string? recoveryCode, bool termsAccepted);
+    Task<AuthResult> SignInAsync(string usernameOrEmail, string password);
     Task SignOutAsync();
+    Task<PasswordResetResult> ResetPasswordAsync(string email);
     Task<PasswordResetResult> ResetPasswordAsync(string username, string recoveryCode, string newPassword);
 
     // Phase 6 - Browse

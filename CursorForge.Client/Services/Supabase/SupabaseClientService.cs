@@ -18,6 +18,7 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
 
     private readonly Dictionary<Guid, (string Name, List<string> Tags, List<string> Roles)> _uploadSessions = new();
     private readonly List<CursorItem> _userCreatedThemes = new();
+    private readonly Dictionary<string, string> _offlineEmailToUsername = new(StringComparer.OrdinalIgnoreCase);
 
     private global::Supabase.Client? _supabase;
     private AuthSession? _currentSession;
@@ -133,12 +134,35 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
         }
     }
 
-    public async Task<AuthResult> SignUpAsync(
-        string username,
-        string password,
-        string recoveryCode,
+    public Task<AuthResult> SignUpAsync(
+        string emailOrUsername,
+        string param2,
+        string param3,
         bool termsAccepted)
     {
+        if (emailOrUsername.Contains('@'))
+        {
+            return SignUpAsync(emailOrUsername, param2, param3, null, termsAccepted);
+        }
+        else
+        {
+            string email = $"{emailOrUsername.Trim().ToLowerInvariant()}@cursorforge.invalid";
+            return SignUpAsync(email, emailOrUsername, param2, param3, termsAccepted);
+        }
+    }
+
+    public async Task<AuthResult> SignUpAsync(
+        string email,
+        string username,
+        string password,
+        string? recoveryCode,
+        bool termsAccepted)
+    {
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@') || !email.Contains('.'))
+        {
+            return new AuthResult(false, "Please provide a valid email address.");
+        }
+
         if (string.IsNullOrWhiteSpace(username))
         {
             return new AuthResult(false, "Username cannot be empty.");
@@ -160,23 +184,17 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             return new AuthResult(false, "You must accept the terms of service.");
         }
 
-        string normalizedCode = CrockfordBase32.Normalize(recoveryCode);
-        if (string.IsNullOrWhiteSpace(normalizedCode) || normalizedCode.Length < 16)
-        {
-            return new AuthResult(false, "Invalid recovery code format.");
-        }
-
-        string recoveryHash = CrockfordBase32.ComputeRecoveryHash(cleanUser, normalizedCode);
-        string email = $"{cleanUser.ToLowerInvariant()}@cursorforge.invalid";
+        string cleanEmail = email.Trim().ToLowerInvariant();
 
         if (!IsConfigured || _supabase == null)
         {
             // Offline demo/mock mode
+            _offlineEmailToUsername[cleanEmail] = cleanUser;
             var mockUser = new AuthUser
             {
                 Id = Guid.NewGuid(),
                 Username = cleanUser,
-                Email = email,
+                Email = cleanEmail,
                 CreatedAt = DateTime.UtcNow
             };
             var mockSession = new AuthSession
@@ -196,7 +214,6 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             var userMetadata = new Dictionary<string, object>
             {
                 { "username", cleanUser },
-                { "recovery_code_hash", recoveryHash },
                 { "terms_accepted", "true" }
             };
 
@@ -205,7 +222,7 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
                 Data = userMetadata
             };
 
-            var response = await _supabase.Auth.SignUp(email, password, signUpOptions);
+            var response = await _supabase.Auth.SignUp(cleanEmail, password, signUpOptions);
             if (response?.User == null)
             {
                 return new AuthResult(false, "Signup failed. No user was returned.");
@@ -216,7 +233,7 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             {
                 Id = userId,
                 Username = cleanUser,
-                Email = email,
+                Email = cleanEmail,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -228,8 +245,24 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
                 User = authUser
             };
 
+            // Register public profile
+            try
+            {
+                var profile = new DbProfile
+                {
+                    Id = userId,
+                    Username = cleanUser,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _supabase.From<DbProfile>().Upsert(profile);
+            }
+            catch (Exception pEx)
+            {
+                _logger?.LogWarning("auth.profile_upsert", "Could not upsert public profile", pEx);
+            }
+
             SetSession(session);
-            _logger?.LogInformation("auth.signup_success", $"Account successfully created for: {cleanUser}");
+            _logger?.LogInformation("auth.signup_success", $"Account successfully created for: {cleanUser} ({cleanEmail})");
             return new AuthResult(true, null, session);
         }
         catch (Exception ex)
@@ -237,11 +270,12 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             if (IsNetworkResolutionOrConnectionError(ex))
             {
                 _logger?.LogWarning("auth.offline_fallback", $"Cannot reach cloud database ({_config.SupabaseUrl}). Creating offline account for {cleanUser}.", ex);
+                _offlineEmailToUsername[cleanEmail] = cleanUser;
                 var offlineUser = new AuthUser
                 {
                     Id = Guid.NewGuid(),
                     Username = cleanUser,
-                    Email = email,
+                    Email = cleanEmail,
                     CreatedAt = DateTime.UtcNow
                 };
                 var offlineSession = new AuthSession
@@ -261,11 +295,11 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
         }
     }
 
-    public async Task<AuthResult> SignInAsync(string username, string password)
+    public async Task<AuthResult> SignInAsync(string usernameOrEmail, string password)
     {
-        if (string.IsNullOrWhiteSpace(username))
+        if (string.IsNullOrWhiteSpace(usernameOrEmail))
         {
-            return new AuthResult(false, "Username is required.");
+            return new AuthResult(false, "Email or Username is required.");
         }
 
         if (string.IsNullOrWhiteSpace(password))
@@ -273,17 +307,29 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             return new AuthResult(false, "Password is required.");
         }
 
-        string cleanUser = username.Trim();
-        string email = $"{cleanUser.ToLowerInvariant()}@cursorforge.invalid";
+        string cleanIdentifier = usernameOrEmail.Trim();
+        string emailToUse = cleanIdentifier;
+        if (!cleanIdentifier.Contains('@'))
+        {
+            emailToUse = $"{cleanIdentifier.ToLowerInvariant()}@cursorforge.invalid";
+        }
 
         if (!IsConfigured || _supabase == null)
         {
             // Offline demo/mock mode
+            string displayUser = cleanIdentifier;
+            if (cleanIdentifier.Contains('@'))
+            {
+                if (!_offlineEmailToUsername.TryGetValue(cleanIdentifier, out displayUser!))
+                {
+                    displayUser = cleanIdentifier.Split('@')[0];
+                }
+            }
             var mockUser = new AuthUser
             {
                 Id = Guid.NewGuid(),
-                Username = cleanUser,
-                Email = email,
+                Username = displayUser,
+                Email = cleanIdentifier.Contains('@') ? cleanIdentifier : $"{cleanIdentifier}@cursorforge.local",
                 CreatedAt = DateTime.UtcNow
             };
             var mockSession = new AuthSession
@@ -300,18 +346,25 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
 
         try
         {
-            var response = await _supabase.Auth.SignInWithPassword(email, password);
+            var response = await _supabase.Auth.SignInWithPassword(emailToUse, password);
             if (response?.User == null)
             {
-                return new AuthResult(false, "Invalid username or password.");
+                return new AuthResult(false, "Invalid email or password.");
             }
 
             Guid userId = Guid.TryParse(response.User.Id, out var parsedId) ? parsedId : Guid.NewGuid();
+            string finalUsername = cleanIdentifier.Contains('@') ? cleanIdentifier.Split('@')[0] : cleanIdentifier;
+
+            if (response.User.UserMetadata != null && response.User.UserMetadata.TryGetValue("username", out var metaUser) && metaUser != null)
+            {
+                finalUsername = metaUser.ToString()!;
+            }
+
             var authUser = new AuthUser
             {
                 Id = userId,
-                Username = cleanUser,
-                Email = email,
+                Username = finalUsername,
+                Email = response.User.Email ?? cleanIdentifier,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -324,19 +377,20 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             };
 
             SetSession(session);
-            _logger?.LogInformation("auth.signin_success", $"User signed in: {cleanUser}");
+            _logger?.LogInformation("auth.signin_success", $"User signed in: {finalUsername}");
             return new AuthResult(true, null, session);
         }
         catch (Exception ex)
         {
             if (IsNetworkResolutionOrConnectionError(ex))
             {
-                _logger?.LogWarning("auth.offline_signin_fallback", $"Cannot reach cloud database ({_config.SupabaseUrl}). Signing in offline for {cleanUser}.", ex);
+                _logger?.LogWarning("auth.offline_signin_fallback", $"Cannot reach cloud database ({_config.SupabaseUrl}). Signing in offline for {cleanIdentifier}.", ex);
+                string displayUser = cleanIdentifier.Contains('@') ? cleanIdentifier.Split('@')[0] : cleanIdentifier;
                 var offlineUser = new AuthUser
                 {
                     Id = Guid.NewGuid(),
-                    Username = cleanUser,
-                    Email = email,
+                    Username = displayUser,
+                    Email = cleanIdentifier.Contains('@') ? cleanIdentifier : $"{cleanIdentifier}@cursorforge.local",
                     CreatedAt = DateTime.UtcNow
                 };
                 var offlineSession = new AuthSession
@@ -351,8 +405,8 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
                 return new AuthResult(true, null, offlineSession);
             }
 
-            _logger?.LogError("auth.signin_failed", $"Sign-in failed for {cleanUser}", ex);
-            return new AuthResult(false, "Invalid credentials or network failure.");
+            _logger?.LogError("auth.signin_failed", $"Sign-in failed for {cleanIdentifier}", ex);
+            return new AuthResult(false, ex.Message);
         }
     }
 
@@ -376,6 +430,31 @@ public sealed partial class SupabaseClientService : ISupabaseClientService
             _tokenStorage.ClearSession();
             AuthStateChanged?.Invoke(false);
             _logger?.LogInformation("auth.signout_success", "User signed out and DPAPI session cleared.");
+        }
+    }
+
+    public async Task<PasswordResetResult> ResetPasswordAsync(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+        {
+            return new PasswordResetResult(false, "Please provide a valid email address.");
+        }
+
+        if (!IsConfigured || _supabase == null)
+        {
+            return new PasswordResetResult(true, null, "OFFLINE-RESET-OK");
+        }
+
+        try
+        {
+            await _supabase.Auth.ResetPasswordForEmail(email.Trim().ToLowerInvariant());
+            _logger?.LogInformation("auth.reset_requested", $"Password reset email sent to: {email}");
+            return new PasswordResetResult(true, null, null);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("auth.reset_error", $"Password reset failed for {email}", ex);
+            return new PasswordResetResult(false, ex.Message);
         }
     }
 

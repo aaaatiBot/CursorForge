@@ -36,3 +36,16 @@ public sealed class DbCursor : BaseModel
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
 }
+
+[Table("profiles")]
+public sealed class DbProfile : BaseModel
+{
+    [PrimaryKey("id", false)]
+    public Guid Id { get; set; }
+
+    [Column("username")]
+    public string Username { get; set; } = string.Empty;
+
+    [Column("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

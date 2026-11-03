@@ -202,4 +202,40 @@ public sealed class SecurityTests : IDisposable
         Assert.False(vm.IsSignedIn);
         Assert.Empty(vm.CurrentUsername);
     }
+
+    [Fact]
+    public async Task AccountViewModel_SignUp_WithEmail_SucceedsAndPersistsEmail()
+    {
+        var localStorage = new LocalStorageService(_testDir);
+        string sessionFile = Path.Combine(_testDir, "state", "session.dat");
+        var tokenStorage = new DpapiTokenStorage(sessionFile);
+        var service = new SupabaseClientService(localStorage, tokenStorage);
+
+        var vm = new AccountViewModel(service)
+        {
+            IsRegisterMode = true,
+            EmailInput = "creator@cursorforge.org",
+            UsernameInput = "creator_pro",
+            PasswordInput = "StrongPassword123!",
+            TermsAccepted = true
+        };
+
+        await vm.SignUpCommand.ExecuteAsync(null);
+
+        Assert.Null(vm.ErrorMessage);
+        Assert.True(vm.IsSignedIn);
+        Assert.Equal("creator_pro", vm.CurrentUsername);
+        Assert.Equal("creator@cursorforge.org", vm.CurrentUserEmail);
+
+        // Sign out and sign back in with email
+        await vm.SignOutCommand.ExecuteAsync(null);
+        Assert.False(vm.IsSignedIn);
+
+        vm.UsernameInput = "creator@cursorforge.org";
+        vm.PasswordInput = "StrongPassword123!";
+        await vm.SignInCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsSignedIn);
+        Assert.Equal("creator_pro", vm.CurrentUsername);
+    }
 }

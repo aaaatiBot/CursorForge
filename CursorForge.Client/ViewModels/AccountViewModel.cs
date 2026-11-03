@@ -21,6 +21,9 @@ public sealed partial class AccountViewModel : ObservableObject
     private string _currentUsername = string.Empty;
 
     [ObservableProperty]
+    private string _currentUserEmail = string.Empty;
+
+    [ObservableProperty]
     private string _currentUserId = string.Empty;
 
     [ObservableProperty]
@@ -35,6 +38,9 @@ public sealed partial class AccountViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isTermsModalOpen;
+
+    [ObservableProperty]
+    private string _emailInput = string.Empty;
 
     [ObservableProperty]
     private string _usernameInput = string.Empty;
@@ -88,14 +94,19 @@ public sealed partial class AccountViewModel : ObservableObject
 
     private void OnAuthStateChanged(bool authenticated)
     {
-        if (Application.Current?.Dispatcher is { } dispatcher && !dispatcher.CheckAccess())
+        if (Application.Current?.Dispatcher is { HasShutdownStarted: false } dispatcher && !dispatcher.CheckAccess())
         {
-            dispatcher.Invoke(RefreshAuthState);
+            try
+            {
+                dispatcher.BeginInvoke(RefreshAuthState);
+            }
+            catch
+            {
+                // Ignored in headless/test environments
+            }
         }
-        else
-        {
-            RefreshAuthState();
-        }
+
+        RefreshAuthState();
     }
 
     private void RefreshAuthState()
@@ -104,11 +115,13 @@ public sealed partial class AccountViewModel : ObservableObject
         if (IsSignedIn && _supabase.CurrentUser != null)
         {
             CurrentUsername = _supabase.CurrentUser.Username;
+            CurrentUserEmail = _supabase.CurrentUser.Email;
             CurrentUserId = _supabase.CurrentUser.Id.ToString();
         }
         else
         {
             CurrentUsername = string.Empty;
+            CurrentUserEmail = string.Empty;
             CurrentUserId = string.Empty;
         }
     }
@@ -136,6 +149,7 @@ public sealed partial class AccountViewModel : ObservableObject
     [RelayCommand]
     public async Task QuickLoginDemoAsync()
     {
+        EmailInput = "momo@cursorforge.local";
         UsernameInput = "momo";
         PasswordInput = "momomomo123";
         TermsAccepted = true;
@@ -153,7 +167,8 @@ public sealed partial class AccountViewModel : ObservableObject
 
         try
         {
-            var result = await _supabase.SignInAsync(UsernameInput, PasswordInput);
+            string idToUse = !string.IsNullOrWhiteSpace(UsernameInput) ? UsernameInput : EmailInput;
+            var result = await _supabase.SignInAsync(idToUse, PasswordInput);
             if (!result.Success)
             {
                 ErrorMessage = result.ErrorMessage ?? "Sign in failed. Check your credentials.";
@@ -189,11 +204,21 @@ public sealed partial class AccountViewModel : ObservableObject
             return;
         }
 
+        string email = !string.IsNullOrWhiteSpace(EmailInput)
+            ? EmailInput.Trim()
+            : $"{UsernameInput.Trim().ToLowerInvariant()}@cursorforge.invalid";
+
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@') || !email.Contains('.'))
+        {
+            ErrorMessage = "Please provide a valid email address.";
+            return;
+        }
+
         IsBusy = true;
         try
         {
             string generatedCode = CrockfordBase32.Generate();
-            var result = await _supabase.SignUpAsync(UsernameInput, PasswordInput, generatedCode, TermsAccepted);
+            var result = await _supabase.SignUpAsync(email, UsernameInput, PasswordInput, TermsAccepted);
 
             if (!result.Success)
             {
@@ -204,7 +229,7 @@ public sealed partial class AccountViewModel : ObservableObject
                 DisplayedRecoveryCode = generatedCode;
                 IsRecoveryModalOpen = true;
                 PasswordInput = string.Empty;
-                SuccessMessage = "Account registered successfully!";
+                SuccessMessage = "Account registered successfully! Welcome to CursorForge.";
             }
         }
         catch (Exception ex)

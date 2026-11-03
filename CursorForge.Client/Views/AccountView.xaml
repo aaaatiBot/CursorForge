@@ -44,7 +44,8 @@
                                 <ui:SymbolIcon Symbol="PersonCircle32" Margin="0,0,12,0" FontSize="36" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"/>
                                 <StackPanel VerticalAlignment="Center">
                                     <ui:TextBlock Text="{Binding CurrentUsername, StringFormat='@{0}'}" FontTypography="Subtitle"/>
-                                    <ui:TextBlock Text="{Binding CurrentUserId, StringFormat='ID: {0}'}" Appearance="Tertiary" FontSize="11"/>
+                                    <ui:TextBlock Text="{Binding CurrentUserEmail}" Appearance="Secondary" FontSize="12"/>
+                                    <ui:TextBlock Text="{Binding CurrentUserId, StringFormat='ID: {0}'}" Appearance="Tertiary" FontSize="10"/>
                                 </StackPanel>
                             </StackPanel>
 
@@ -79,10 +80,21 @@
                                              FontWeight="SemiBold"/>
                             </StackPanel>
 
-                            <!-- Username Input -->
-                            <ui:TextBlock Text="Username" FontTypography="BodyStrong" Margin="0,0,0,4"/>
+                            <!-- Email Input (Registration Only) -->
+                            <StackPanel Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVis}}">
+                                <ui:TextBlock Text="Email Address" FontTypography="BodyStrong" Margin="0,0,0,4"/>
+                                <ui:TextBox Text="{Binding EmailInput, UpdateSourceTrigger=PropertyChanged}" 
+                                            PlaceholderText="e.g. you@example.com" 
+                                            Margin="0,0,0,12"/>
+                            </StackPanel>
+
+                            <!-- Username Input (Email or Username in Sign In; Creator Username in Register) -->
+                            <ui:TextBlock Text="Email or Username" FontTypography="BodyStrong" Margin="0,0,0,4" 
+                                          Visibility="{Binding IsRegisterMode, Converter={StaticResource InverseBoolToVis}}"/>
+                            <ui:TextBlock Text="Public Username (Creator Tag)" FontTypography="BodyStrong" Margin="0,0,0,4" 
+                                          Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVis}}"/>
                             <ui:TextBox Text="{Binding UsernameInput, UpdateSourceTrigger=PropertyChanged}" 
-                                        PlaceholderText="e.g. cursor_master" 
+                                        PlaceholderText="e.g. momo or you@example.com" 
                                         Margin="0,0,0,12"/>
 
                             <!-- Password Input -->
@@ -103,7 +115,7 @@
                                         </Hyperlink>
                                     </TextBlock>
                                 </StackPanel>
-                                <ui:TextBlock Text="No email required. A 20-character single-use Crockford recovery key will be generated for account recovery." 
+                                <ui:TextBlock Text="Your email will be kept private for signing in and password resets. Your username will be publicly displayed on themes." 
                                               Appearance="Tertiary" FontSize="11" TextWrapping="Wrap"/>
                             </StackPanel>
 
